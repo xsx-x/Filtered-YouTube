@@ -51,89 +51,105 @@
 <script>
     const API_KEY = 'AIzaSyClbzreAS3p3pzS16vpjgb41KAKIHL5Vtk'; // <--- הכנס כאן את המפתח שלך
 
-    async function searchVideos() {
-        const query = document.getElementById('searchInput').value;
-        if (!query) return;
+let isYoutubeApiReady = false;
 
-        document.getElementById('openVideos').innerHTML = 'מתחיל בבדיקה...';
-        document.getElementById('blockedVideos').innerHTML = '';
-        document.getElementById('hidden-check-container').innerHTML = '';
+// פונקציה שנקראת אוטומטית כשה-API של יוטיוב מוכן
+function onYouTubeIframeAPIReady() {
+    isYoutubeApiReady = true;
+}
 
-        try {
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}`;
-            const response = await fetch(url);
-            const data = await response.json();
-
-            if (data.error) throw new Error(data.error.message);
-
-            document.getElementById('openVideos').innerHTML = '';
-            
-            data.items.forEach(video => {
-                createVideoPlaceholder(video);
-                checkVideoRealAccess(video.id.videoId);
-            });
-        } catch (error) {
-            alert('שגיאת API: ' + error.message);
-        }
+async function searchVideos() {
+    if (!isYoutubeApiReady) {
+        alert("הספריה של יוטיוב עדיין נטענת, נסה שוב בעוד רגע");
+        return;
     }
 
-    // יצירת כרטיס זמני במצב "בבדיקה"
-    function createVideoPlaceholder(video) {
-        const videoId = video.id.videoId;
-        const card = document.createElement('div');
-        card.className = 'video-card';
-        card.id = 'card-' + videoId;
-        card.innerHTML = `
-            <span class="status-badge checking-badge" id="status-${videoId}">בבדיקה...</span>
-            <img src="https://i.ytimg.com/vi/${videoId}/mqdefault.jpg">
-            <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">${video.snippet.title}</a>
-        `;
-        // בהתחלה כולם נכנסים לרשימת ה"חסומים/בבדיקה"
-        document.getElementById('blockedVideos').appendChild(card);
-    }
+    const query = document.getElementById('searchInput').value;
+    if (!query) return;
 
-    function checkVideoRealAccess(videoId) {
-        const checkDiv = document.createElement('div');
-        checkDiv.id = 'checker-' + videoId;
-        document.getElementById('hidden-check-container').appendChild(checkDiv);
+    document.getElementById('openVideos').innerHTML = 'מתחיל בבדיקה עמוקה...';
+    document.getElementById('blockedVideos').innerHTML = '';
+    document.getElementById('hidden-check-container').innerHTML = '';
 
-        let checkTimeout = setTimeout(() => {
-            finalizeStatus(videoId, false);
-            player.destroy();
-        }, 5000); // ממתין 5 שניות לטעינה
+    try {
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
 
-        let player = new YT.Player(checkDiv.id, {
-            height: '0', width: '0', videoId: videoId,
-            events: {
-                'onReady': (event) => {
-                    clearTimeout(checkTimeout);
-                    finalizeStatus(videoId, true);
-                    event.target.destroy();
-                },
-                'onError': () => {
-                    clearTimeout(checkTimeout);
-                    finalizeStatus(videoId, false);
-                }
-            }
-        });
-    }
+        if (data.error) throw new Error(data.error.message);
 
-    function finalizeStatus(videoId, isOpen) {
-        const card = document.getElementById('card-' + videoId);
-        const badge = document.getElementById('status-' + videoId);
+        document.getElementById('openVideos').innerHTML = '';
         
-        if (!card) return;
-
-        if (isOpen) {
-            badge.innerText = 'פתוח';
-            badge.className = 'status-badge open-badge';
-            document.getElementById('openVideos').appendChild(card);
-        } else {
-            badge.innerText = 'חסום / אין גישה';
-            badge.className = 'status-badge blocked-badge';
-            document.getElementById('blockedVideos').appendChild(card);
-        }
+        data.items.forEach(video => {
+            createVideoPlaceholder(video);
+            checkVideoRealAccess(video.id.videoId);
+        });
+    } catch (error) {
+        alert('שגיאת API: ' + error.message);
     }
+}
+
+function createVideoPlaceholder(video) {
+    const videoId = video.id.videoId;
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.id = 'card-' + videoId;
+    card.innerHTML = `
+        <span class="status-badge checking-badge" id="status-${videoId}">בבדיקה...</span>
+        <img src="https://i.ytimg.com/vi/${videoId}/mqdefault.jpg">
+        <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">${video.snippet.title}</a>
+    `;
+    document.getElementById('blockedVideos').appendChild(card);
+}
+
+function checkVideoRealAccess(videoId) {
+    const checkDiv = document.createElement('div');
+    checkDiv.id = 'checker-' + videoId;
+    document.getElementById('hidden-check-container').appendChild(checkDiv);
+
+    // הגדרת זמן המתנה ארוך יותר לסינונים איטיים
+    let checkTimeout = setTimeout(() => {
+        finalizeStatus(videoId, false);
+        try { player.destroy(); } catch(e) {}
+    }, 7000); 
+
+    let player = new YT.Player(checkDiv.id, {
+        height: '0',
+        width: '0',
+        videoId: videoId,
+        playerVars: {
+            // הגדרת ה-Origin פותרת את שגיאת ה-postMessage
+            'origin': window.location.origin 
+        },
+        events: {
+            'onReady': (event) => {
+                clearTimeout(checkTimeout);
+                finalizeStatus(videoId, true);
+                event.target.destroy();
+            },
+            'onError': () => {
+                clearTimeout(checkTimeout);
+                finalizeStatus(videoId, false);
+            }
+        }
+    });
+}
+
+function finalizeStatus(videoId, isOpen) {
+    const card = document.getElementById('card-' + videoId);
+    const badge = document.getElementById('status-' + videoId);
+    if (!card) return;
+
+    if (isOpen) {
+        badge.innerText = 'פתוח';
+        badge.className = 'status-badge open-badge';
+        document.getElementById('openVideos').appendChild(card);
+    } else {
+        badge.innerText = 'חסום / אין גישה';
+        badge.className = 'status-badge blocked-badge';
+        // הוא כבר נמצא ב-blockedVideos, רק מעדכנים סטטוס
+    }
+}
 </script>
 
 </body>
