@@ -402,9 +402,12 @@
     // ================= זיהוי סינון =================
     async function initFilterDetection() {
         try {
-            // תיקון: שימוש ב-HTTPS כדי למנוע שגיאת Mixed Content. 
-            await fetch('https://netfree.link/api/user', { mode: 'no-cors', cache: 'no-store' });
-            detectedFilter = 'NetFree';
+            const response = await fetch('https://netfree.link/api/user', { cache: 'no-store' });
+            if (response.ok) {
+                detectedFilter = 'NetFree';
+            } else {
+                detectedFilter = 'Other';
+            }
         } catch (e) {
             detectedFilter = 'Other';
         }
