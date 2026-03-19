@@ -805,7 +805,7 @@
             document.getElementById('openGrid').appendChild(card); // מוצג מיד במרכז
             if (saveToDB && detectedFilter === 'NetFree') saveToGlobalIndex(videoId, title, true);
         } else if (status === 'netfree_pending') {
-            tag.innerText = "נחסם / טרם נבדק"; tag.className = "status-badge status-pending";
+            tag.innerText = "טרם נבדק"; tag.className = "status-badge status-pending";
             card.classList.add('clickable'); card.onclick = () => openPlayerModal(videoId, title, thumbUrl);
             document.getElementById('blockedRow').appendChild(card);
         } else {
