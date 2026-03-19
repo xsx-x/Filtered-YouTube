@@ -117,7 +117,6 @@
             width: 100%;
         }
 
-        /* החלפת ה-Select לכפתורי Toggle (סעיף 5) */
         .search-type-toggle {
             display: flex; background: var(--bg-body); border-radius: 14px; padding: 4px;
             border: 1px solid var(--border-color);
@@ -170,22 +169,20 @@
         .main-layout {
             display: grid;
             grid-template-columns: minmax(0, 1fr) 280px;
-            grid-template-areas: "open checking" "blocked ads";
+            grid-template-areas: "open sidebar" "blocked sidebar";
             gap: 30px; max-width: 1400px; margin: 0 auto; width: 100%;
         }
 
         .section-open { grid-area: open; min-width: 0; }
-        .section-checking { grid-area: checking; min-width: 0; }
+        .sidebar-column { grid-area: sidebar; display: flex; flex-direction: column; gap: 30px; position: sticky; top: 20px; height: max-content; z-index: 5; }
         .section-blocked { grid-area: blocked; min-width: 0; }
-        .section-ads { grid-area: ads; min-width: 0; }
 
         @media (max-width: 1024px) {
             .main-layout { display: flex; flex-direction: column; width: 100%; }
             body { padding: 15px; }
             .section-open { order: 1; }
-            .section-checking { order: 2; }
+            .sidebar-column { order: 2; position: static; height: auto; }
             .section-blocked { order: 3; }
-            .section-ads { order: 4; }
         }
 
         .section-title { font-size: 1.4em; font-weight: 800; color: var(--text-main); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
@@ -232,7 +229,7 @@
         .checking-container {
             background: var(--bg-glass); border-radius: 20px; padding: 20px;
             border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); display: none;
-            position: sticky; top: 20px; max-height: calc(100vh - 40px); overflow-y: auto;
+            max-height: 50vh; overflow-y: auto;
         }
         .checking-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 10px; }
         
@@ -274,6 +271,10 @@
         .channel-card img { width: 80px; height: 80px; border-radius: 50%; margin-bottom: 12px; border: 2px solid var(--border-color); }
         .channel-card h3 { font-size: 14px; font-weight: 700; color: var(--text-main); }
 
+        /* ================= היסטוריה ולשוניות ================= */
+        .history-tabs .btn-base { background: var(--bg-glass); border: 1px solid var(--border-color); color: var(--text-main); }
+        .history-tabs .btn-base.active-tab { background: var(--primary); color: white; border-color: transparent; }
+
         /* ================= מודלים (Modals) ================= */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -288,6 +289,10 @@
         .modal-content {
             width: 100%; background: #000; border-radius: 16px; overflow: hidden;
             box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); aspect-ratio: 16/9; border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+        .modal-content iframe {
+            position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; border: none;
         }
         .close-btn {
             position: absolute; top: -45px; right: 0; background: rgba(255,255,255,0.1); color: white;
@@ -295,7 +300,39 @@
         }
         .close-btn:hover { background: var(--danger); }
 
-        /* מודל הגדרות (סעיף 2) */
+        /* ================= מיני נגן (Mini Player) ================= */
+        .minimize-btn {
+            position: absolute; top: -45px; right: 85px; background: rgba(255,255,255,0.1); color: white;
+            border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .minimize-btn:hover { background: var(--primary); }
+
+        .modal-overlay.mini-player-mode {
+            background: transparent;
+            backdrop-filter: none;
+            pointer-events: none;
+            align-items: flex-end;
+            justify-content: flex-end;
+            padding: 30px;
+        }
+        .modal-overlay.mini-player-mode .modal-content-wrapper {
+            width: 380px;
+            pointer-events: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .modal-overlay.mini-player-mode .modal-content {
+            border: 2px solid var(--primary);
+        }
+        .modal-overlay.mini-player-mode .minimize-btn { top: -35px; right: 65px; padding: 4px 10px; font-size: 12px; }
+        .modal-overlay.mini-player-mode .close-btn { top: -35px; padding: 4px 10px; font-size: 12px; }
+        
+        @media (max-width: 768px) {
+            .modal-overlay.mini-player-mode { padding: 15px; }
+            .modal-overlay.mini-player-mode .modal-content-wrapper { width: 100%; max-width: 320px; }
+        }
+
+        /* מודל הגדרות */
         .settings-modal {
             background: var(--bg-card); padding: 30px; border-radius: 24px;
             width: 100%; max-width: 450px; border: 1px solid var(--border-color);
@@ -367,6 +404,9 @@
             <span class="loader" id="searchLoader"></span>
             <span id="searchText">חפש</span>
         </button>
+        <button id="randomBtn" class="btn-search" style="background: linear-gradient(135deg, var(--accent), #7c3aed); min-width: auto; padding: 0 20px; font-size: 22px;" onclick="playRandomVideo()" title="נגן סרטון אקראי">
+            🎲
+        </button>
     </div>
 </div>
 
@@ -379,14 +419,37 @@
     
     <!-- צד פתוחים -->
     <div class="section-open" id="mainContentArea">
-        <div class="section-title" id="mainAreaTitle">✨ סרטונים זמינים</div>
-        <div id="openGrid" class="video-grid"></div>
-        <div id="channelGrid" class="channel-grid" style="display: none;"></div>
         
-        <div style="text-align: center; margin-top: 30px;">
-            <button id="loadMoreBtn" class="btn-base" style="background: var(--bg-glass); border: 1px solid var(--border-color); color: var(--text-main); margin: auto; display: none;" onclick="handleSearch(true)">טען עוד תוצאות 🔽</button>
-            <button id="loadMoreHistoryBtn" class="btn-base" style="background: var(--primary); color: white; margin: auto; display: none;" onclick="fetchAndShowHistory(true)">טען היסטוריה ישנה יותר 🕒</button>
+        <!-- אזור התוצאות הראשי (מוסתר כשהיסטוריה פתוחה) -->
+        <div id="searchResultsView">
+            <div class="section-title" id="mainAreaTitle">✨ סרטונים זמינים</div>
+            <div id="openGrid" class="video-grid"></div>
+            <div id="channelGrid" class="channel-grid" style="display: none;"></div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <button id="loadMoreBtn" class="btn-base" style="background: var(--bg-glass); border: 1px solid var(--border-color); color: var(--text-main); margin: auto; display: none;" onclick="handleSearch(true)">טען עוד תוצאות 🔽</button>
+            </div>
         </div>
+
+        <!-- אזור היסטוריה (מוסתר כברירת מחדל) -->
+        <div id="historyView" style="display: none;">
+            <div class="section-title">
+                <button onclick="showSearchResultsView()" class="btn-icon" style="margin-left: 15px; font-size: 16px; width: 35px; height: 35px;" title="חזור לתוצאות החיפוש">🔙</button>
+                🕒 היסטוריה
+            </div>
+            
+            <div class="history-tabs" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button id="tabWatched" class="btn-base active-tab" onclick="switchHistoryTab('watched')">👁️ סרטונים שצפיתי</button>
+                <button id="tabOpened" class="btn-base" onclick="switchHistoryTab('opened')">✅ תוצאות פתוחות מקומית</button>
+            </div>
+
+            <div id="historyGrid" class="video-grid"></div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <button id="loadMoreHistoryBtn" class="btn-base" style="background: var(--primary); color: white; margin: auto; display: none;" onclick="fetchAndShowHistory(true)">טען היסטוריה ישנה יותר 🕒</button>
+            </div>
+        </div>
+        
     </div>
 
     <!-- עמודת צד (Sidebar) - כולל בתוכה את אזור הבדיקה והפרסומת -->
@@ -419,7 +482,7 @@
 </div>
 
 <div class="footer">
-    נבנה על ידי <strong>'לב טוב'</strong> | שדרוג ממשק מתקדם 2026<br>
+    נבנה על ידי <strong onclick="handleSecretTrigger()" style="cursor: pointer;">'לב טוב'</strong> | שדרוג ממשק מתקדם 2026<br>
     <a href="mailto:myylbwt@gmail.com">myylbwt@gmail.com</a>
     <div style="margin-top: 15px;">
         <button onclick="promptUserForKey()" class="btn-base" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); display: inline-flex;">🔑 הגדר מפתח API אישי</button>
@@ -430,6 +493,7 @@
 <div class="modal-overlay" id="videoModal">
     <div class="modal-content-wrapper">
         <button class="close-btn" onclick="closePlayer()">✖ סגור</button>
+        <button class="minimize-btn" id="minimizeBtn" onclick="toggleMiniPlayer()">🔽 מזער</button>
         <div class="modal-content" id="playerContainerWrapper">
             <div id="playerContainer"></div>
         </div>
@@ -490,10 +554,27 @@
     
     // משתני הגדרות ונגן
     let dynamicCheckTimeout = 12000;
-    let concurrentChecks = 5; // ברירת מחדל לסעיף 2
+    let concurrentChecks = 5; 
     let ytModalPlayer = null;
     let currentPlayingVideoId = null;
-    let apiRetryCount = 0; // מונה נסיונות לרוטציית מפתחות
+    let apiRetryCount = 0; 
+    let currentHistoryTab = 'watched';
+
+    function showSearchResultsView() {
+        document.getElementById('historyView').style.display = 'none';
+        document.getElementById('searchResultsView').style.display = 'block';
+        
+        if (currentQuery === '' && !currentChannelId && detectedFilter === 'NetFree') {
+            document.getElementById('homeMarquee').style.display = 'block';
+        }
+        
+        if (document.getElementById('checkingGrid').children.length > 0) {
+            document.getElementById('checkingSidebarWrapper').style.display = 'block';
+        }
+        if (document.getElementById('blockedRow').children.length > 0) {
+            document.getElementById('blockedSection').style.display = 'block';
+        }
+    }
 
     // ================= מצב פיתוח (סימולציית נטפרי) =================
     let secretClickCount = 0;
@@ -511,7 +592,6 @@
     }
 
     document.addEventListener('keydown', function(e) {
-        // קיצור מקשים: Ctrl + Alt + N (או מ' בעברית)
         if (e.ctrlKey && e.altKey && (e.key === 'n' || e.key === 'N' || e.key === 'מ')) {
             e.preventDefault();
             toggleNetFreeSimulation();
@@ -537,7 +617,6 @@
     function toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('darkMode', document.body.classList.contains('dark-mode')); }
     initDarkMode();
 
-    // הגדרות מקומיות
     if(localStorage.getItem('concurrentChecks')) {
         concurrentChecks = parseInt(localStorage.getItem('concurrentChecks'));
         document.getElementById('concurrentInput').value = concurrentChecks;
@@ -545,7 +624,6 @@
 
     // ================= זיהוי סינון ואתחול דף הבית =================
     async function initSystem() {
-        // בדיקת מצב סימולציה סודי
         if (sessionStorage.getItem('simulate_netfree') === 'true') {
             detectedFilter = 'NetFree';
             document.getElementById('btnNetFreeDeepCheck').style.display = 'inline-flex';
@@ -592,7 +670,7 @@
                 }
             } catch(e){}
         } else {
-            if (currentUser) setTimeout(() => fetchAndShowHistory(), 500);
+            if (currentUser) setTimeout(() => switchHistoryTab('watched'), 500);
         }
     }
 
@@ -634,10 +712,10 @@
             authContainer.innerHTML = `
                 ${settingsBtn}${darkModeBtn}
                 <div class="user-profile"><img src="${currentUser.user_metadata.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'}" referrerpolicy="no-referrer"><span>${currentUser.user_metadata.full_name || 'משתמש'}</span></div>
-                <button class="btn-icon" title="היסטוריה" onclick="fetchAndShowHistory()">🕒</button>
+                <button class="btn-icon" title="היסטוריה" onclick="switchHistoryTab('watched')">🕒</button>
                 <button class="btn-icon" title="התנתק" style="color:var(--danger);" onclick="logout()">🚪</button>
             `;
-            if (detectedFilter !== 'NetFree' && currentQuery === '') fetchAndShowHistory();
+            if (detectedFilter !== 'NetFree' && currentQuery === '') switchHistoryTab('watched');
         } else {
             authContainer.innerHTML = `${settingsBtn}${darkModeBtn}<button class="btn-base btn-google" onclick="loginWithGoogle()"><img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg">התחבר</button>`;
         }
@@ -671,11 +749,12 @@
         setLoading(true, isLoadMore);
 
         if (!isLoadMore) {
+            showSearchResultsView();
             currentQuery = queryInput; currentChannelId = forceChannelId || ''; nextPageToken = '';
             document.getElementById('checkingGrid').innerHTML = ''; document.getElementById('openGrid').innerHTML = '';
             document.getElementById('channelGrid').innerHTML = ''; document.getElementById('blockedRow').innerHTML = '';
             document.getElementById('checkingSidebarWrapper').style.display = 'none'; document.getElementById('blockedSection').style.display = 'none';
-            document.getElementById('loadMoreHistoryBtn').style.display = 'none'; document.getElementById('homeMarquee').style.display = 'none';
+            document.getElementById('homeMarquee').style.display = 'none';
             document.getElementById('mainAreaTitle').innerHTML = '✨ תוצאות החיפוש';
         }
 
@@ -699,7 +778,7 @@
             const data = await response.json();
             
             if (data.error) throw new Error(data.error.message);
-            apiRetryCount = 0; // איפוס במקרה של הצלחה
+            apiRetryCount = 0;
             
             nextPageToken = data.nextPageToken || '';
             document.getElementById('loadMoreBtn').style.display = nextPageToken ? 'inline-flex' : 'none';
@@ -710,11 +789,10 @@
             else processVideos(data.items);
 
         } catch (e) {
-            // החלפה שקטה של מפתחות (סעיף 4)
             if (e.message.includes('quota') || e.message.includes('403') || e.message.includes('exceeded')) {
                 if (apiRetryCount < CONFIG.API_KEYS.length) {
                     rotateApiKey(); apiRetryCount++;
-                    return handleSearch(isLoadMore, forceChannelId); // מנסה שוב שקוף
+                    return handleSearch(isLoadMore, forceChannelId); 
                 } else {
                     alert("כל מפתחות הגיבוי שלנו נוצלו להיום. אנא הגדר מפתח אישי בהגדרות (סמל המפתח למטה).");
                 }
@@ -735,7 +813,7 @@
         document.getElementById('channelGrid').appendChild(div);
     }
 
-    // ================= לוגיקת בדיקת סרטונים אסינכרונית (סעיף 1) =================
+    // ================= לוגיקת בדיקת סרטונים אסינכרונית =================
     async function processVideos(videos) {
         document.getElementById('checkingSidebarWrapper').style.display = 'block';
         document.getElementById('blockedSection').style.display = 'block';
@@ -744,7 +822,7 @@
             const id = v.id.videoId; const thumb = v.snippet.thumbnails.medium.url; const title = v.snippet.title;
             const fullCard = document.createElement('div');
             fullCard.className = 'card'; fullCard.id = `card-${id}`; fullCard.style.display = 'none';
-            fullCard.dataset.title = title; fullCard.dataset.thumb = thumb;
+            fullCard.dataset.title = title; fullCard.dataset.thumb = thumb; fullCard.dataset.vid = id;
             fullCard.innerHTML = `<div id="status-${id}" class="status-badge status-pending">ממתין...</div><div class="thumb-wrap"><img src="${thumb}"><div class="play-btn">&#9658;</div></div><div class="card-body"><h3>${title}</h3><div class="card-meta"><span>📺 ${v.snippet.channelTitle}</span><span>📅 ${formatDate(v.snippet.publishedAt)}</span></div></div>`;
             document.getElementById('hidden-checker').appendChild(fullCard);
 
@@ -760,17 +838,15 @@
             if (dbData) dbData.forEach(row => dbStatusMap[row.video_id] = row.status);
         }
 
-        // שימוש בתור משימות אסינכרוני - פותר את ההמתנה לקבוצות שלמות (סעיף 1)
         await processWithConcurrency(videos, concurrentChecks, (v) => executeSingleCheck(v, dbStatusMap[v.id.videoId]));
     }
 
-    // פונקציית תור למשימות אסינכרוניות
     async function processWithConcurrency(items, maxConcurrent, asyncFn) {
         let index = 0;
         async function worker() {
             while (index < items.length) {
                 const item = items[index++];
-                await asyncFn(item); // ברגע שזה מסתיים, הסרטון מוצג מיד והוורקר לוקח משימה חדשה
+                await asyncFn(item);
             }
         }
         const workers = [];
@@ -787,7 +863,6 @@
         if (dbStatus === 'open') return finalizeStatus(videoId, 'open', title, false);
 
         if (detectedFilter === 'NetFree') {
-            // תיקון קריטי לנטפרי (סעיף 0) - בדיקת הוידאו ישירות מול ה-API של נטפרי, לא רק תמונה
             try {
                 const res = await fetch(`https://netfree.link/api/video/info?video=${videoId}`);
                 const data = await res.json();
@@ -832,6 +907,14 @@
         });
     }
 
+    function saveToLocalOpenHistory(id, title, thumb) {
+        let list = JSON.parse(localStorage.getItem('my_opened_videos') || '[]');
+        list = list.filter(v => v.id !== id);
+        list.unshift({ id, title, thumb, date: Date.now() });
+        if (list.length > 200) list = list.slice(0, 200); 
+        localStorage.setItem('my_opened_videos', JSON.stringify(list));
+    }
+
     function finalizeStatus(videoId, status, title, saveToDB) {
         if (status === true) status = 'open'; if (status === false) status = 'blocked';
         videoCache[videoId] = status;
@@ -846,7 +929,10 @@
         if (status === 'open') {
             tag.innerText = "פתוח"; tag.className = "status-badge status-open";
             card.classList.add('clickable'); card.onclick = () => openPlayerModal(videoId, title, thumbUrl);
-            document.getElementById('openGrid').appendChild(card); // מוצג מיד במרכז
+            document.getElementById('openGrid').appendChild(card);
+            
+            saveToLocalOpenHistory(videoId, title, thumbUrl); 
+            
             if (saveToDB && detectedFilter === 'NetFree') saveToGlobalIndex(videoId, title, true);
         } else if (status === 'netfree_pending') {
             tag.innerText = "טרם נבדק"; tag.className = "status-badge status-pending";
@@ -881,22 +967,35 @@
         btn.innerText = "סיום בדיקה"; setTimeout(() => { btn.innerText = "🔍 בדיקה מורחבת בנטפרי"; btn.disabled = false; }, 3000);
     }
 
-    // ================= נגן, היסטוריה וניגון אוטומטי (סעיף 3) =================
+    // ================= נגן =================
+    function toggleMiniPlayer() {
+        const modal = document.getElementById('videoModal');
+        const btn = document.getElementById('minimizeBtn');
+        modal.classList.toggle('mini-player-mode');
+        
+        if (modal.classList.contains('mini-player-mode')) {
+            btn.innerHTML = '🔼 הגדל';
+        } else {
+            btn.innerHTML = '🔽 מזער';
+        }
+    }
+
     async function openPlayerModal(videoId, title, imgUrl) {
         currentPlayingVideoId = videoId;
-        document.getElementById('videoModal').classList.add('active');
+        const modal = document.getElementById('videoModal');
+        modal.classList.add('active');
         
-        // הדגשת הסרטון המתנגן
+        modal.classList.remove('mini-player-mode');
+        document.getElementById('minimizeBtn').innerHTML = '🔽 מזער';
+        
         document.querySelectorAll('.card').forEach(c => c.classList.remove('active-playing'));
-        const playingCard = document.getElementById(`card-${videoId}`);
+        const playingCard = document.querySelector(`.card[data-vid="${videoId}"]`);
         if(playingCard) playingCard.classList.add('active-playing');
         
-        // שימוש ב-API של יוטיוב לטובת זיהוי סיום הניגון (Autoplay Next)
         if (ytModalPlayer) {
             ytModalPlayer.destroy();
         }
         
-        // יצירת div חדש כי יוטיוב דורס אותו
         document.getElementById('playerContainerWrapper').innerHTML = '<div id="playerContainer"></div>';
         
         ytModalPlayer = new YT.Player('playerContainer', {
@@ -914,7 +1013,6 @@
         }
     }
 
-    // מאזין לשינוי מצב הנגן - אם הסתיים עובר לבא בתור
     function onModalPlayerStateChange(event) {
         if (event.data === YT.PlayerState.ENDED) {
             playNextVideo();
@@ -922,16 +1020,17 @@
     }
 
     async function playNextVideo() {
-        const grid = document.getElementById('openGrid');
+        let grid = document.getElementById('historyView').style.display === 'block' ? 
+                   document.getElementById('historyGrid') : 
+                   document.getElementById('openGrid');
+                   
         const cards = Array.from(grid.querySelectorAll('.card'));
-        const currentIndex = cards.findIndex(c => c.id === `card-${currentPlayingVideoId}`);
+        const currentIndex = cards.findIndex(c => c.dataset.vid === currentPlayingVideoId);
 
         if (currentIndex !== -1 && currentIndex < cards.length - 1) {
-            // יש סרטון הבא ברשימה
             const nextCard = cards[currentIndex + 1];
-            openPlayerModal(nextCard.id.replace('card-', ''), nextCard.dataset.title, nextCard.dataset.thumb);
+            openPlayerModal(nextCard.dataset.vid, nextCard.dataset.title, nextCard.dataset.thumb);
         } else {
-            // רשימה נגמרה - טוען אקראי
             showToast("רשימת התוצאות הסתיימה. מפעיל סרטון אקראי.");
             playRandomVideo();
         }
@@ -945,7 +1044,14 @@
                 openPlayerModal(rnd.video_id, rnd.title, `https://i.ytimg.com/vi/${rnd.video_id}/mqdefault.jpg`);
             } else { showToast("לא נמצאו סרטונים במאגר."); }
         } else {
-            if (!currentUser) return alert("יש להתחבר לחשבון כדי לנגן סרטון אקראי מההיסטוריה.");
+            let list = JSON.parse(localStorage.getItem('my_opened_videos') || '[]');
+            if (list.length > 0) {
+                 const rnd = list[Math.floor(Math.random() * list.length)];
+                 openPlayerModal(rnd.id, rnd.title, rnd.thumb);
+                 return;
+            }
+            
+            if (!currentUser) return alert("יש להתחבר לחשבון כדי לנגן סרטון אקראי מההיסטוריה, או לחפש סרטונים תחילה.");
             const { data } = await supabaseClient.from('user_history').select('*').eq('user_id', currentUser.id).limit(50);
             if (data && data.length > 0) {
                 const rnd = data[Math.floor(Math.random() * data.length)];
@@ -966,6 +1072,7 @@
         document.querySelectorAll('.card').forEach(c => c.classList.remove('active-playing'));
     }
 
+    // ================= היסטוריה ולשוניות =================
     function switchHistoryTab(tab) {
         if (currentHistoryTab === tab && document.getElementById('historyView').style.display === 'block') return;
         currentHistoryTab = tab;
