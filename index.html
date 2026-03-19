@@ -887,22 +887,24 @@
         } else {
             // רשימה נגמרה - טוען אקראי
             showToast("רשימת התוצאות הסתיימה. מפעיל סרטון אקראי.");
-            
-            if (detectedFilter === 'NetFree') {
-                const { data } = await supabaseClient.from('videos').select('*').eq('status', 'open').eq('filter_provider', 'NetFree').limit(50);
-                if (data && data.length > 0) {
-                    const rnd = data[Math.floor(Math.random() * data.length)];
-                    openPlayerModal(rnd.video_id, rnd.title, `https://i.ytimg.com/vi/${rnd.video_id}/mqdefault.jpg`);
-                }
-            } else {
-                if (currentUser) {
-                    const { data } = await supabaseClient.from('user_history').select('*').eq('user_id', currentUser.id).limit(50);
-                    if (data && data.length > 0) {
-                        const rnd = data[Math.floor(Math.random() * data.length)];
-                        openPlayerModal(rnd.video_id, rnd.title, rnd.thumbnail_url);
-                    }
-                }
-            }
+            playRandomVideo();
+        }
+    }
+
+    async function playRandomVideo() {
+        if (detectedFilter === 'NetFree') {
+            const { data } = await supabaseClient.from('videos').select('*').eq('status', 'open').eq('filter_provider', 'NetFree').limit(50);
+            if (data && data.length > 0) {
+                const rnd = data[Math.floor(Math.random() * data.length)];
+                openPlayerModal(rnd.video_id, rnd.title, `https://i.ytimg.com/vi/${rnd.video_id}/mqdefault.jpg`);
+            } else { showToast("לא נמצאו סרטונים במאגר."); }
+        } else {
+            if (!currentUser) return alert("יש להתחבר לחשבון כדי לנגן סרטון אקראי מההיסטוריה.");
+            const { data } = await supabaseClient.from('user_history').select('*').eq('user_id', currentUser.id).limit(50);
+            if (data && data.length > 0) {
+                const rnd = data[Math.floor(Math.random() * data.length)];
+                openPlayerModal(rnd.video_id, rnd.title, rnd.thumbnail_url);
+            } else { showToast("אין מספיק סרטונים בהיסטוריה שלך."); }
         }
     }
 
