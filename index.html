@@ -57,6 +57,11 @@
         /* ================= איפוס ועיצוב כללי ================= */
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
 
+        html, body {
+            max-width: 100vw;
+            overflow-x: hidden; /* מונע גלילה אופקית וגדילה אינסופית של המסך */
+        }
+
         body {
             background-color: var(--bg-body);
             background-image: radial-gradient(var(--bg-dots) 1.5px, transparent 1.5px);
@@ -68,6 +73,7 @@
             flex-direction: column;
             padding: 20px 40px;
             transition: background-color 0.3s, color 0.3s;
+            width: 100%;
         }
 
         /* ================= כותרת עליונה ואזור התחברות ================= */
@@ -108,6 +114,30 @@
             max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px;
             background: var(--bg-glass); backdrop-filter: blur(12px); padding: 25px;
             border-radius: 24px; border: 1px solid var(--border-color); box-shadow: var(--shadow-md);
+            width: 100%;
+        }
+
+        .search-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; /* תוספת למניעת פריצה במובייל */ }
+        
+        .search-type-select {
+            padding: 15px 20px; border-radius: 14px; border: 1px solid var(--border-color);
+            background: var(--bg-card); color: var(--text-main); font-size: 16px; font-weight: 600;
+            outline: none; cursor: pointer; transition: 0.3s; flex-shrink: 0;
+        }
+        .search-type-select:focus { border-color: var(--primary); }
+
+        .search-input-wrapper { display: flex; flex: 1; position: relative; min-width: 200px; }
+        .search-input-wrapper input {
+            width: 100%; padding: 18px 24px; border-radius: 14px; border: 1px solid var(--border-color);
+            font-size: 16px; background: var(--bg-card); color: var(--text-main); outline: none;
+            transition: 0.3s; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .search-input-wrapper input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15); }
+
+        .btn-search {
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: white;
+            padding: 0 30px; border-radius: 14px; font-size: 16px; font-weight: bold; height: 55px;
+            display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow-sm); flex-shrink: 0;
         }
 
         .search-controls { display: flex; gap: 10px; align-items: center; }
@@ -161,23 +191,25 @@
         /* ================= חלוקה חכמה (Grid) ================= */
         .main-layout {
             display: grid;
-            grid-template-columns: 1fr 280px; /* צד ימין אזור תוכן, צד שמאל צדדי (בגלל RTL) */
+            grid-template-columns: minmax(0, 1fr) 280px; /* תוקן מ-1fr כדי למנוע דחיפת גבולות המסך */
             grid-template-areas:
                 "open checking"
                 "blocked ads";
             gap: 30px; max-width: 1400px; margin: 0 auto; width: 100%;
         }
 
-        .section-open { grid-area: open; }
-        .section-checking { grid-area: checking; }
-        .section-blocked { grid-area: blocked; }
-        .section-ads { grid-area: ads; }
+        .section-open { grid-area: open; min-width: 0; }
+        .section-checking { grid-area: checking; min-width: 0; }
+        .section-blocked { grid-area: blocked; min-width: 0; }
+        .section-ads { grid-area: ads; min-width: 0; }
 
         /* מצב מובייל: לפי בקשתך 1. פתוחים 2. בבדיקה 3. חסומים */
         @media (max-width: 1024px) {
             .main-layout {
                 display: flex; flex-direction: column;
+                width: 100%;
             }
+            body { padding: 15px; } /* התאמת שוליים למסכים קטנים */
             .section-open { order: 1; }
             .section-checking { order: 2; }
             .section-blocked { order: 3; }
@@ -246,9 +278,10 @@
         }
 
         /* ================= סרטונים חסומים (Scroll Row) ================= */
-        .blocked-container { margin-top: 40px; display: none; }
+        .blocked-container { margin-top: 40px; display: none; width: 100%; }
         .blocked-scroll {
             display: flex; gap: 16px; overflow-x: auto; padding-bottom: 20px; scroll-behavior: smooth;
+            width: 100%; /* מוודא שהגלילה נשארת בתוך המסגרת */
         }
         .blocked-scroll::-webkit-scrollbar { height: 8px; }
         .blocked-scroll::-webkit-scrollbar-track { background: var(--bg-card); border-radius: 10px; }
