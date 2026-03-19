@@ -389,10 +389,21 @@
         </div>
     </div>
 
-    <!-- צד בבדיקה -->
-    <div class="section-checking checking-container" id="checkingSidebarWrapper">
-        <div class="section-title" style="font-size: 1.1em; color: var(--warning);">⏳ בדיקה פעילה</div>
-        <div class="checking-grid" id="checkingGrid"></div>
+    <!-- עמודת צד (Sidebar) - כולל בתוכה את אזור הבדיקה והפרסומת -->
+    <div class="sidebar-column">
+        <!-- צד בבדיקה -->
+        <div class="section-checking checking-container" id="checkingSidebarWrapper">
+            <div class="section-title" style="font-size: 1.1em; color: var(--warning);">⏳ בדיקה פעילה</div>
+            <div class="checking-grid" id="checkingGrid"></div>
+        </div>
+
+        <!-- חסות (פרסומת מיושרת הצידה) -->
+        <div class="section-ads">
+            <div style="background: var(--bg-glass); padding: 15px; border-radius: 16px; border: 1px solid var(--border-color); text-align: center; box-shadow: var(--shadow-sm);">
+                <h4 style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">💡 חסות</h4>
+                <iframe src="https://xsxs.neocities.org/ads" width="100%" height="250" frameborder="0" scrolling="no" style="border-radius: 10px;"></iframe>
+            </div>
+        </div>
     </div>
 
     <!-- תחתית חסומים -->
@@ -404,14 +415,6 @@
             </button>
         </div>
         <div class="blocked-scroll" id="blockedRow"></div>
-    </div>
-
-    <!-- חסות -->
-    <div class="section-ads">
-        <div style="background: var(--bg-glass); padding: 15px; border-radius: 16px; border: 1px solid var(--border-color); text-align: center;">
-            <h4 style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">💡 חסות</h4>
-            <iframe src="https://xsxs.neocities.org/ads" width="100%" height="250" frameborder="0" scrolling="no" style="border-radius: 10px;"></iframe>
-        </div>
     </div>
 </div>
 
@@ -897,6 +900,8 @@
         document.getElementById('playerContainerWrapper').innerHTML = '<div id="playerContainer"></div>';
         
         ytModalPlayer = new YT.Player('playerContainer', {
+            height: '100%',
+            width: '100%',
             videoId: videoId,
             playerVars: { 'autoplay': 1, 'rel': 0 },
             events: {
@@ -952,19 +957,80 @@
     function closePlayer() {
         document.getElementById('playerContainerWrapper').innerHTML = '<div id="playerContainer"></div>';
         if (ytModalPlayer) { try { ytModalPlayer.destroy(); ytModalPlayer = null; } catch(e){} }
-        document.getElementById('videoModal').classList.remove('active');
+        
+        const modal = document.getElementById('videoModal');
+        modal.classList.remove('active');
+        modal.classList.remove('mini-player-mode');
+        document.getElementById('minimizeBtn').innerHTML = '🔽 מזער';
+        
         document.querySelectorAll('.card').forEach(c => c.classList.remove('active-playing'));
+    }
+
+    function switchHistoryTab(tab) {
+        if (currentHistoryTab === tab && document.getElementById('historyView').style.display === 'block') return;
+        currentHistoryTab = tab;
+        document.getElementById('historyGrid').innerHTML = '';
+        document.getElementById('loadMoreHistoryBtn').style.display = 'none';
+        
+        if (tab === 'watched') {
+            document.getElementById('tabWatched').classList.add('active-tab');
+            document.getElementById('tabOpened').classList.remove('active-tab');
+            fetchAndShowHistory(false);
+        } else {
+            document.getElementById('tabOpened').classList.add('active-tab');
+            document.getElementById('tabWatched').classList.remove('active-tab');
+            
+            document.getElementById('searchResultsView').style.display = 'none';
+            document.getElementById('checkingSidebarWrapper').style.display = 'none'; 
+            document.getElementById('blockedSection').style.display = 'none';
+            document.getElementById('homeMarquee').style.display = 'none'; 
+            document.getElementById('historyView').style.display = 'block';
+            
+            renderLocalOpenHistory();
+        }
+    }
+
+    function renderLocalOpenHistory() {
+        const grid = document.getElementById('historyGrid');
+        const list = JSON.parse(localStorage.getItem('my_opened_videos') || '[]');
+        
+        if (list.length === 0) {
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:var(--text-muted);">טרם נשמרו סרטונים פתוחים מקומית. התחל לחפש וסרטונים שנמצאו פתוחים יישמרו כאן.</div>';
+            return;
+        }
+        
+        list.forEach(v => {
+            const dateStr = new Date(v.date).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' });
+            const card = document.createElement('div');
+            card.className = 'card clickable'; card.dataset.vid = v.id; card.dataset.title = v.title; card.dataset.thumb = v.thumb;
+            card.onclick = () => openPlayerModal(v.id, v.title, v.thumb);
+            card.innerHTML = `
+                <div class="status-badge status-open">${dateStr}</div>
+                <div class="thumb-wrap"><img src="${v.thumb}"><div class="play-btn">&#9658;</div></div>
+                <div class="card-body"><h3>${v.title}</h3></div>
+            `;
+            grid.appendChild(card);
+        });
     }
 
     async function fetchAndShowHistory(isLoadMore = false) {
         if (!currentUser) return alert("יש להתחבר לחשבון גוגל.");
-        const grid = document.getElementById('openGrid'); const loadBtn = document.getElementById('loadMoreHistoryBtn');
+        const grid = document.getElementById('historyGrid'); const loadBtn = document.getElementById('loadMoreHistoryBtn');
 
         if (!isLoadMore) {
-            historyOffset = 0; document.getElementById('mainAreaTitle').innerHTML = '🕒 היסטוריית הצפיות שלי';
-            document.getElementById('checkingSidebarWrapper').style.display = 'none'; document.getElementById('blockedSection').style.display = 'none';
-            document.getElementById('channelGrid').style.display = 'none'; grid.style.display = 'grid'; grid.innerHTML = '';
-            document.getElementById('homeMarquee').style.display = 'none'; document.getElementById('loadMoreBtn').style.display = 'none';
+            historyOffset = 0;
+            document.getElementById('searchResultsView').style.display = 'none';
+            document.getElementById('checkingSidebarWrapper').style.display = 'none'; 
+            document.getElementById('blockedSection').style.display = 'none';
+            document.getElementById('homeMarquee').style.display = 'none'; 
+            
+            document.getElementById('historyView').style.display = 'block';
+            grid.innerHTML = ''; 
+            loadBtn.style.display = 'none';
+            
+            currentHistoryTab = 'watched';
+            document.getElementById('tabWatched').classList.add('active-tab');
+            document.getElementById('tabOpened').classList.remove('active-tab');
         } else { loadBtn.disabled = true; loadBtn.innerText = 'טוען...'; }
 
         try {
@@ -973,8 +1039,8 @@
             if (!isLoadMore && data.length === 0) { grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:var(--text-muted);">אין היסטוריה.</div>'; loadBtn.style.display = 'none'; return; }
 
             data.forEach(v => {
-                const card = document.createElement('div'); card.className = 'card clickable'; card.id = `card-${v.video_id}`;
-                card.dataset.title = v.title; card.dataset.thumb = v.thumbnail_url;
+                const card = document.createElement('div'); card.className = 'card clickable'; card.id = `hist-card-${v.video_id}`;
+                card.dataset.title = v.title; card.dataset.thumb = v.thumbnail_url; card.dataset.vid = v.video_id;
                 card.onclick = () => openPlayerModal(v.video_id, v.title, v.thumbnail_url);
                 card.innerHTML = `<div class="status-badge status-history">${new Date(v.watched_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' })}</div><div class="thumb-wrap"><img src="${v.thumbnail_url}"><div class="play-btn">&#9658;</div></div><div class="card-body"><h3>${v.title}</h3></div>`;
                 grid.appendChild(card);
