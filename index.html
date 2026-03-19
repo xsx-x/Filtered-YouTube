@@ -492,6 +492,41 @@
     let currentPlayingVideoId = null;
     let apiRetryCount = 0; // מונה נסיונות לרוטציית מפתחות
 
+    // ================= מצב פיתוח (סימולציית נטפרי) =================
+    let secretClickCount = 0;
+    let secretClickTimer;
+
+    function handleSecretTrigger() {
+        secretClickCount++;
+        clearTimeout(secretClickTimer);
+        secretClickTimer = setTimeout(() => { secretClickCount = 0; }, 1500);
+        
+        if (secretClickCount === 5) {
+            secretClickCount = 0;
+            toggleNetFreeSimulation();
+        }
+    }
+
+    document.addEventListener('keydown', function(e) {
+        // קיצור מקשים: Ctrl + Alt + N (או מ' בעברית)
+        if (e.ctrlKey && e.altKey && (e.key === 'n' || e.key === 'N' || e.key === 'מ')) {
+            e.preventDefault();
+            toggleNetFreeSimulation();
+        }
+    });
+
+    function toggleNetFreeSimulation() {
+        const isSimulating = sessionStorage.getItem('simulate_netfree');
+        if (isSimulating) {
+            sessionStorage.removeItem('simulate_netfree');
+            alert("מצב מפתח: סימולציית נטפרי כובתה. הדף ירוענן כעת.");
+        } else {
+            sessionStorage.setItem('simulate_netfree', 'true');
+            alert("מצב מפתח: סימולציית נטפרי הופעלה בהצלחה! הדף ירוענן כעת.");
+        }
+        window.location.reload();
+    }
+
     window.onYouTubeIframeAPIReady = function() { isYTReady = true; };
 
     // ================= אתחול ומצב לילה =================
@@ -507,15 +542,21 @@
 
     // ================= זיהוי סינון ואתחול דף הבית =================
     async function initSystem() {
-        try {
-            const response = await fetch('https://netfree.link/api/user', { cache: 'no-store' });
-            detectedFilter = response.ok ? 'NetFree' : 'Other';
-        } catch (e) { detectedFilter = 'Other'; }
-
-        if (detectedFilter === 'NetFree') {
+        // בדיקת מצב סימולציה סודי
+        if (sessionStorage.getItem('simulate_netfree') === 'true') {
+            detectedFilter = 'NetFree';
             document.getElementById('btnNetFreeDeepCheck').style.display = 'inline-flex';
         } else {
-            initSpeedTest();
+            try {
+                const response = await fetch('https://netfree.link/api/user', { cache: 'no-store' });
+                detectedFilter = response.ok ? 'NetFree' : 'Other';
+            } catch (e) { detectedFilter = 'Other'; }
+
+            if (detectedFilter === 'NetFree') {
+                document.getElementById('btnNetFreeDeepCheck').style.display = 'inline-flex';
+            } else {
+                initSpeedTest();
+            }
         }
 
         const { data: { session } } = await supabaseClient.auth.getSession();
