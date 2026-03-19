@@ -300,6 +300,19 @@
         .loader { border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* ================= התראות קופצות (Toast) ================= */
+        #toast-notification {
+            position: fixed; bottom: 30px; right: 30px; background: var(--bg-card);
+            border-right: 4px solid var(--warning); padding: 16px 24px; border-radius: 12px;
+            box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 15px;
+            z-index: 9999; transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
+            font-size: 14px; font-weight: 600; color: var(--text-main); border: 1px solid var(--border-color);
+            direction: rtl;
+        }
+        .toast-hidden { transform: translateX(150%); opacity: 0; pointer-events: none; }
+        #toast-notification button { background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; transition: 0.2s; }
+        #toast-notification button:hover { color: var(--danger); background: #fee2e2; border-color: #fca5a5; }
+
     </style>
 </head>
 <body>
@@ -397,6 +410,13 @@
     </div>
 </div>
 
+<!-- התראת מערכת קופצת -->
+<div id="toast-notification" class="toast-hidden">
+    <span style="font-size: 1.5em;">⚠️</span>
+    <span id="toast-message"></span>
+    <button onclick="document.getElementById('toast-notification').classList.add('toast-hidden')">✖</button>
+</div>
+
 <div id="hidden-checker"></div>
 
 <script>
@@ -423,6 +443,7 @@
     let nextPageToken = '';
     let historyOffset = 0; 
     const HISTORY_PAGE_SIZE = 50;
+    let dynamicCheckTimeout = 12000; // זמן בדיקת נגן ברירת מחדל
 
     window.onYouTubeIframeAPIReady = function() { isYTReady = true; };
 
@@ -445,6 +466,8 @@
 
         if (detectedFilter === 'NetFree') {
             document.getElementById('btnNetFreeDeepCheck').style.display = 'inline-flex';
+        } else {
+            initSpeedTest(); // הפעלת בדיקת מהירות נסתרת למשתמשי סינון שאינו נטפרי
         }
 
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -484,6 +507,46 @@
                 setTimeout(() => fetchAndShowHistory(), 500);
             }
         }
+    }
+
+    // ================= בדיקת מהירות גלישה אוטומטית =================
+    function testInternetSpeed() {
+        return new Promise((resolve) => {
+            const testImg = "https://i.ytimg.com/vi/LXb3EKWsInQ/maxresdefault.jpg"; // תמונה שוקלת כ-120KB
+            const img = new Image();
+            const startTime = new Date().getTime();
+            
+            img.onload = function() {
+                const endTime = new Date().getTime();
+                const duration = (endTime - startTime) / 1000; 
+                const bitsLoaded = 1000000; // כ-1 מגה ביט (לצורכי חישוב)
+                let speedBps = bitsLoaded / duration;
+                let speedMbps = (speedBps / 1024 / 1024).toFixed(1);
+                resolve(parseFloat(speedMbps));
+            }
+            img.onerror = function() { resolve(10); } // במקרה של שגיאה נניח מהירות תקינה
+            img.src = testImg + "?cache=" + startTime;
+        });
+    }
+
+    async function initSpeedTest() {
+        const speed = await testInternetSpeed();
+        
+        if (speed < 3.5) {
+            dynamicCheckTimeout = 25000; // 25 שניות רשת איטית
+            showToast(`מהירות הגלישה שלך איטית כעת (${speed} Mbps). זמן טעינת הסרטונים לבדיקה הוארך כדי להבטיח תוצאות מדויקות.`);
+        } else if (speed > 15) {
+            dynamicCheckTimeout = 8000; // 8 שניות רשת מהירה
+        } else {
+            dynamicCheckTimeout = 12000; // 12 שניות רשת רגילה
+        }
+    }
+
+    function showToast(msg) {
+        document.getElementById('toast-message').innerText = msg;
+        const toast = document.getElementById('toast-notification');
+        toast.classList.remove('toast-hidden');
+        setTimeout(() => { toast.classList.add('toast-hidden'); }, 8000); 
     }
 
     // ================= Auth =================
@@ -688,9 +751,9 @@
         const videoId = v.id.videoId;
         const title = v.snippet.title;
         
-        // התחלת טיימר
+        // התחלת טיימר מתואם מהירות גלישה
         const isNetfree = detectedFilter === 'NetFree';
-        startTimer(videoId, isNetfree ? 2 : 12);
+        startTimer(videoId, isNetfree ? 2 : Math.round(dynamicCheckTimeout / 1000));
 
         // אם יש במטמון לוקאלי או ב DB
         if (videoCache[videoId] !== undefined) {
@@ -750,7 +813,7 @@
                 }
             });
             
-            const timeout = setTimeout(() => { if (!resolved) { resolved = true; cleanup(false); } }, 12000);
+            const timeout = setTimeout(() => { if (!resolved) { resolved = true; cleanup(false); } }, dynamicCheckTimeout);
             
             function cleanup(isOpen) {
                 clearTimeout(timeout);
