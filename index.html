@@ -831,10 +831,10 @@
                 const data = await res.json();
                 if (data.block === true) { tag.innerText = "חסום רשמית"; tag.className = "status-badge status-blocked"; }
                 else if (data.block === false) { tag.innerText = "פתוח בנטפרי"; tag.className = "status-badge status-open"; }
-                else { tag.innerText = "עדיין לא נבדק"; tag.className = "status-badge status-pending"; }
+                else { tag.innerText = "טרם נבדק"; tag.className = "status-badge status-pending"; }
             } catch (e) { tag.innerText = "שגיאת רשת"; }
         }
-        btn.innerText = "סיום בדיקה"; setTimeout(() => { btn.innerText = "🔍 בדוק סטטוס מדויק בנטפרי"; btn.disabled = false; }, 3000);
+        btn.innerText = "סיום בדיקה"; setTimeout(() => { btn.innerText = "🔍 בדיקה מורחבת בנטפרי"; btn.disabled = false; }, 3000);
     }
 
     // ================= נגן, היסטוריה וניגון אוטומטי (סעיף 3) =================
