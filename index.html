@@ -327,7 +327,7 @@
         .modal-content-wrapper { position: relative; width: 100%; max-width: 1100px; transform: scale(0.95); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; flex-direction: column; gap: 12px; }
         .modal-overlay.active .modal-content-wrapper { transform: scale(1); }
         
-        .modal-header { display: flex; justify-content: flex-end; gap: 12px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; position: relative; z-index: 10000; margin-bottom: 5px; }
         
         .modal-content {
             width: 100%; background: #000; border-radius: var(--radius-md); overflow: hidden;
@@ -343,6 +343,11 @@
         }
         .close-btn:hover { background: var(--danger); border-color: var(--danger); }
         .minimize-btn:hover { background: var(--primary); border-color: var(--primary); }
+        
+        .external-yt-btn {
+            background: linear-gradient(135deg, #ef4444, #b91c1c); color: white; padding: 10px 18px; font-size: 14px; text-decoration: none; border-radius: 10px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 6px; font-weight: 800; transition: 0.3s;
+        }
+        .external-yt-btn:hover { transform: scale(1.05); box-shadow: var(--shadow-md); color: white; }
 
         /* ================= מיני נגן (Mini Player) ================= */
         .modal-overlay.mini-player-mode {
@@ -354,8 +359,9 @@
             transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); gap: 0;
         }
         .modal-overlay.mini-player-mode .modal-header {
-            position: absolute; top: -45px; right: 0; width: 100%; justify-content: flex-end; padding: 0;
+            position: absolute; top: -45px; right: 0; width: 100%; justify-content: flex-end; padding: 0; z-index: 10000;
         }
+        .modal-overlay.mini-player-mode .external-yt-btn { display: none; }
         .modal-overlay.mini-player-mode .modal-content { border: 3px solid var(--primary); border-radius: 16px; }
         .modal-overlay.mini-player-mode .minimize-btn, .modal-overlay.mini-player-mode .close-btn { padding: 6px 12px; font-size: 13px; }
         
@@ -371,6 +377,8 @@
             .modal-overlay.mini-player-mode { padding: 15px; }
             .modal-overlay.mini-player-mode .modal-content-wrapper { width: 100%; max-width: 320px; }
             .modal-overlay.mini-player-mode .modal-header { top: -35px; }
+            .modal-header { flex-direction: column-reverse; align-items: stretch; gap: 8px; }
+            .external-yt-btn { justify-content: center; }
         }
 
         /* מודל הגדרות */
@@ -592,8 +600,14 @@
 <div class="modal-overlay" id="videoModal">
     <div class="modal-content-wrapper">
         <div class="modal-header">
-            <button class="minimize-btn" id="minimizeBtn" onclick="toggleMiniPlayer()">🔽 מזער</button>
-            <button class="close-btn" onclick="closePlayer()">✖ סגור</button>
+            <!-- כפתור פתיחה חיצוני לפתרון באגים של חברות סינון -->
+            <a id="externalYtLink" href="#" target="_blank" class="external-yt-btn">
+                🔗 לא עובד? פתח ישירות ביוטיוב
+            </a>
+            <div style="display: flex; gap: 12px;">
+                <button class="minimize-btn" id="minimizeBtn" onclick="toggleMiniPlayer()">🔽 מזער</button>
+                <button class="close-btn" onclick="closePlayer()">✖ סגור</button>
+            </div>
         </div>
         <div class="modal-content" id="playerContainerWrapper">
             <div id="playerContainer"></div>
@@ -641,6 +655,13 @@
 <div id="hidden-checker"></div>
 
 <script>
+    // סגירת חלונות בלחיצה על הרקע השחור מסביב
+    document.getElementById('videoModal').addEventListener('click', function(e) {
+        if (e.target === this && !this.classList.contains('mini-player-mode')) {
+            closePlayer();
+        }
+    });
+
     // ================= הגדרות מערכת =================
     const CONFIG = {
         API_KEYS: [
@@ -1255,8 +1276,9 @@
     }
 
     // פונקציית מעקף - Fallback במקרה שסינון שובר את ה-API של יוטיוב בנגן הקדמי
+    // שימוש ב-nocookie עשוי לעזור לעקוף באגים של חברות הסינון
     function createRawIframeFallback(container, videoId) {
-        container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1" width="100%" height="100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+        container.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1" width="100%" height="100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
     }
 
     async function openPlayerModal(videoId, title, imgUrl) {
@@ -1265,7 +1287,12 @@
         modal.classList.add('active');
         
         modal.classList.remove('mini-player-mode');
-        document.getElementById('minimizeBtn').innerHTML = '🔽 מזער';
+        
+        const minBtn = document.getElementById('minimizeBtn');
+        if(minBtn) minBtn.innerHTML = '🔽 מזער';
+        
+        const extLink = document.getElementById('externalYtLink');
+        if(extLink) extLink.href = `https://www.youtube.com/watch?v=${videoId}`;
         
         document.querySelectorAll('.card').forEach(c => c.classList.remove('active-playing'));
         const playingCard = document.querySelector(`.card[data-vid="${videoId}"]`);
@@ -1356,15 +1383,29 @@
     }
 
     function closePlayer() {
-        document.getElementById('playerContainerWrapper').innerHTML = '<div id="playerContainer"></div>';
-        if (ytModalPlayer) { try { ytModalPlayer.destroy(); ytModalPlayer = null; } catch(e){} }
-        
-        const modal = document.getElementById('videoModal');
-        modal.classList.remove('active');
-        modal.classList.remove('mini-player-mode');
-        document.getElementById('minimizeBtn').innerHTML = '🔽 מזער';
-        
-        document.querySelectorAll('.card').forEach(c => c.classList.remove('active-playing'));
+        try {
+            if (ytModalPlayer) { 
+                try { ytModalPlayer.destroy(); } catch(e){} 
+                ytModalPlayer = null; 
+            }
+            
+            const wrapper = document.getElementById('playerContainerWrapper');
+            if (wrapper) wrapper.innerHTML = '<div id="playerContainer"></div>';
+            
+            const modal = document.getElementById('videoModal');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.classList.remove('mini-player-mode');
+            }
+            
+            const minBtn = document.getElementById('minimizeBtn');
+            if (minBtn) minBtn.innerHTML = '🔽 מזער';
+            
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('active-playing'));
+        } catch (err) {
+            console.error("Force closing modal due to error", err);
+            document.getElementById('videoModal').classList.remove('active');
+        }
     }
 
     // ================= היסטוריה ולשוניות =================
