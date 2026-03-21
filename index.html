@@ -516,7 +516,7 @@
             
             <div class="history-tabs" style="display: flex; gap: 15px; margin-bottom: 25px;">
                 <button id="tabWatched" class="btn-base active-tab" onclick="switchHistoryTab('watched')">👁️ סרטונים שצפיתי</button>
-                <button id="tabOpened" class="btn-base" onclick="switchHistoryTab('opened')">✅ תוצאות פתוחות מקומית</button>
+                <button id="tabOpened" class="btn-base" onclick="switchHistoryTab('opened')">✅ תוצאות שזוהו כפתוחות בחיפושים שלי</button>
             </div>
 
             <div id="historyGrid" class="video-grid"></div>
@@ -700,7 +700,9 @@
         window.location.reload();
     }
 
-    window.onYouTubeIframeAPIReady = function() { isYTReady = true; };
+    window.onYouTubeIframeAPIReady = function() { 
+        isYTReady = true; 
+    };
 
     // ================= אתחול ומצב לילה =================
     function initDarkMode() { if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark-mode'); }
@@ -717,14 +719,14 @@
         const savedFilter = localStorage.getItem('userSelectedFilter');
         let isNetfreeEnv = false;
 
-        // בדיקה מול שרתי נטפרי
         if (sessionStorage.getItem('simulate_netfree') === 'true') {
             isNetfreeEnv = true;
         } else {
             try {
+                // בדיקת שגיאות ה-CORS כאן מטופלות ולא תוקעות את האתר
                 const response = await fetch('https://netfree.link/api/user', { cache: 'no-store' });
                 if(response.ok) isNetfreeEnv = true;
-            } catch (e) { }
+            } catch (e) { } // שגיאת רשת (כמו CORS) תיתפס כאן
         }
 
         if (isNetfreeEnv) {
@@ -732,14 +734,12 @@
             localStorage.setItem('userSelectedFilter', 'NetFree');
             document.getElementById('btnNetFreeDeepCheck').style.display = 'inline-flex';
             
-            // הצגת באנר נטפרי
             const nfBanner = document.getElementById('netfreeDetectedBanner');
             nfBanner.classList.add('show');
             setTimeout(() => nfBanner.classList.remove('show'), 5000);
             
         } else {
             initSpeedTest();
-            // הצגת באנר בחירה אם טרם נבחר סינון
             if (!savedFilter || savedFilter === 'Unknown') {
                 setTimeout(() => document.getElementById('filterSelectionBanner').classList.add('show'), 1500);
             } else {
@@ -784,7 +784,6 @@
         }
 
         try {
-            // שליפת הסרטונים שפתוחים לסינון הנוכחי (עד 100 כדי למלא שורות)
             const { data } = await supabaseClient.from('videos').select('*')
                 .eq('status', 'open').eq('filter_provider', detectedFilter)
                 .order('updated_at', { ascending: false }).limit(100);
@@ -808,7 +807,6 @@
             return;
         }
 
-        // חלוקה ל-3 שורות
         const rows = [[], [], []];
         videos.forEach((v, index) => {
             rows[index % 3].push(v);
@@ -818,10 +816,8 @@
             if(rowVideos.length === 0) return;
             
             const rowDiv = document.createElement('div');
-            // כיוונים שונים לשורות
             rowDiv.className = `db-marquee-row ${rowIndex % 2 === 0 ? 'scroll-right' : 'scroll-left'}`;
             
-            // שכפול התוכן כדי ליצור רצף אינסופי של הסרט הנע
             const createHtml = () => rowVideos.map(v => `
                 <div class="db-mini-card" onclick="openPlayerModal('${v.video_id}', '${v.title.replace(/'/g, "\\'")}', 'https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg')">
                     <img src="https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg" loading="lazy">
@@ -829,7 +825,6 @@
                 </div>
             `).join('');
 
-            // מכניסים פעמיים כדי שהאנימציה תראה רציפה
             rowDiv.innerHTML = createHtml() + createHtml();
             container.appendChild(rowDiv);
         });
@@ -896,7 +891,6 @@
     }
 
     async function loginWithGoogle() { 
-        // שימוש בפרמטרים מיוחדים כדי למנוע חסימות בנטפרי (Force consent and offline type)
         const { error } = await supabaseClient.auth.signInWithOAuth({ 
             provider: 'google', 
             options: { 
@@ -944,7 +938,7 @@
 
     // ================= חיפוש =================
     async function handleSearch(isLoadMore = false, forceChannelId = null) {
-        if (!isYTReady) return;
+        // הסרנו את התלות ב-isYTReady כדי למנוע חסימה אם הסינון חוסם את הסקריפט של יוטיוב!
         
         const searchType = document.querySelector('input[name="searchType"]:checked').value;
         const queryInput = document.getElementById('searchInput').value.trim();
@@ -1037,7 +1031,6 @@
         });
 
         let dbStatusMap = {};
-        // בדיקה במסד נתונים לפי הסינון המזוהה!
         if (detectedFilter !== 'Unknown' && detectedFilter !== 'None') {
             const { data: dbData } = await supabaseClient.from('videos').select('video_id, status').eq('filter_provider', detectedFilter).in('video_id', videos.map(v => v.id.videoId));
             if (dbData) dbData.forEach(row => dbStatusMap[row.video_id] = row.status);
@@ -1076,8 +1069,12 @@
                 else finalizeStatus(videoId, 'netfree_pending', title, false);
             } catch (e) { finalizeStatus(videoId, 'netfree_pending', title, false); }
         } else {
-            // כל סינון אחר מבצע בדיקת נגן נסתר
-            await deepPlayerCheck(videoId, title);
+            // אם סקריפט ה-API נחסם לחלוטין - נניח שהסרטון בבדיקה / סומן כפתוח כברירת מחדל כדי שהמשתמש יוכל לנסות לנגן אותו
+            if (typeof YT === 'undefined' || !YT.Player) {
+                finalizeStatus(videoId, 'open', title, false); 
+            } else {
+                await deepPlayerCheck(videoId, title);
+            }
         }
     }
 
@@ -1099,26 +1096,43 @@
             document.getElementById('hidden-checker').appendChild(checkDiv);
 
             let resolved = false;
-            const player = new YT.Player(divId, {
-                videoId: videoId, playerVars: { 'autoplay': 1, 'mute': 1 },
-                events: {
-                    'onReady': (e) => e.target.playVideo(),
-                    'onStateChange': (e) => { if (!resolved && (e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.BUFFERING)) { resolved = true; cleanup(true); } },
-                    'onError': () => { if (!resolved) { resolved = true; cleanup(false); } }
-                }
-            });
+            let player;
+            
+            try {
+                player = new YT.Player(divId, {
+                    videoId: videoId, playerVars: { 'autoplay': 1, 'mute': 1 },
+                    events: {
+                        'onReady': (e) => e.target.playVideo(),
+                        'onStateChange': (e) => { if (!resolved && (e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.BUFFERING)) { resolved = true; cleanup(true); } },
+                        'onError': () => { if (!resolved) { resolved = true; cleanup(false); } }
+                    }
+                });
+            } catch(e) {
+                // Fallback במקרה של קריסה עקב חסימת ה-API
+                if (!resolved) { resolved = true; cleanup(true); } // נניח פתוח כדי לא לחסום סתם
+            }
             
             const timeout = setTimeout(() => { if (!resolved) { resolved = true; cleanup(false); } }, dynamicCheckTimeout);
-            function cleanup(isOpen) { clearTimeout(timeout); try { player.destroy(); document.getElementById(divId)?.remove(); } catch(err){} finalizeStatus(videoId, isOpen ? 'open' : 'blocked', title, true); resolve(); }
+            function cleanup(isOpen) { clearTimeout(timeout); try { if(player && player.destroy) player.destroy(); document.getElementById(divId)?.remove(); } catch(err){} finalizeStatus(videoId, isOpen ? 'open' : 'blocked', title, true); resolve(); }
         });
     }
 
-    function saveToLocalOpenHistory(id, title, thumb) {
+    // הפונקציה שומרת את החיפושים החיוביים האישיים גם בענן בחשבון המשתמש
+    async function saveToUserOpenVideos(id, title, thumb) {
+        // שמירה מקומית כגיבוי למקרה שאין חשבון מחובר
         let list = JSON.parse(localStorage.getItem('my_opened_videos') || '[]');
         list = list.filter(v => v.id !== id);
         list.unshift({ id, title, thumb, date: Date.now() });
         if (list.length > 200) list = list.slice(0, 200); 
         localStorage.setItem('my_opened_videos', JSON.stringify(list));
+
+        // שמירה לענן בחשבון המשתמש אם הוא מחובר
+        if (!currentUser) return;
+        try {
+            await supabaseClient.from('user_open_videos').upsert([
+                { user_id: currentUser.id, video_id: id, title: title, thumbnail_url: thumb, filter_provider: detectedFilter }
+            ], { onConflict: 'user_id, video_id' });
+        } catch(e) { console.error("Could not save to user_open_videos DB", e); }
     }
 
     function finalizeStatus(videoId, status, title, saveToDB) {
@@ -1137,9 +1151,9 @@
             card.classList.add('clickable'); card.onclick = () => openPlayerModal(videoId, title, thumbUrl);
             document.getElementById('openGrid').appendChild(card);
             
-            saveToLocalOpenHistory(videoId, title, thumbUrl); 
+            // שומר לתוצאות האישיות בענן ובמקומי!
+            saveToUserOpenVideos(videoId, title, thumbUrl); 
             
-            // שמירה לדיבי לפי הסינון שמוגדר
             if (saveToDB && detectedFilter !== 'Unknown' && detectedFilter !== 'None') saveToGlobalIndex(videoId, title, true);
         } else if (status === 'netfree_pending') {
             tag.innerText = "טרם נבדק"; tag.className = "status-badge status-pending";
@@ -1191,6 +1205,11 @@
         }
     }
 
+    // פונקציית מעקף - Fallback במקרה שסינון שובר את ה-API של יוטיוב
+    function createRawIframeFallback(container, videoId) {
+        container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1" width="100%" height="100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    }
+
     async function openPlayerModal(videoId, title, imgUrl) {
         currentPlayingVideoId = videoId;
         const modal = document.getElementById('videoModal');
@@ -1204,20 +1223,36 @@
         if(playingCard) playingCard.classList.add('active-playing');
         
         if (ytModalPlayer) {
-            ytModalPlayer.destroy();
+            try { ytModalPlayer.destroy(); } catch(e){}
+            ytModalPlayer = null;
         }
         
-        document.getElementById('playerContainerWrapper').innerHTML = '<div id="playerContainer"></div>';
+        const containerWrapper = document.getElementById('playerContainerWrapper');
+        containerWrapper.innerHTML = '<div id="playerContainer"></div>';
         
-        ytModalPlayer = new YT.Player('playerContainer', {
-            height: '100%',
-            width: '100%',
-            videoId: videoId,
-            playerVars: { 'autoplay': 1, 'rel': 0 },
-            events: {
-                'onStateChange': onModalPlayerStateChange
+        // יצירת הנגן עם בדיקה אם ה-API נשבר על ידי חברת הסינון
+        if (typeof YT !== 'undefined' && YT.Player) {
+            try {
+                ytModalPlayer = new YT.Player('playerContainer', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: videoId,
+                    playerVars: { 'autoplay': 1, 'rel': 0 },
+                    events: {
+                        'onStateChange': onModalPlayerStateChange,
+                        'onError': (e) => { 
+                            // אם יוטיוב זורק שגיאת הפעלה, נעבור למעקף ה-Iframe
+                            createRawIframeFallback(containerWrapper, videoId); 
+                        }
+                    }
+                });
+            } catch(e) {
+                createRawIframeFallback(containerWrapper, videoId);
             }
-        });
+        } else {
+            // ה-API חסום לחלוטין (נפוץ בסינונים קפדניים) - יצירת Iframe רגיל
+            createRawIframeFallback(containerWrapper, videoId);
+        }
 
         if (currentUser) {
             try { await supabaseClient.from('user_history').insert([{ user_id: currentUser.id, video_id: videoId, title: title, thumbnail_url: imgUrl }]); } catch(err) {}
@@ -1304,20 +1339,38 @@
             document.getElementById('dbShowcase').style.display = 'none'; 
             document.getElementById('historyView').style.display = 'block';
             
-            renderLocalOpenHistory();
+            fetchAndShowOpenedResults();
         }
     }
 
-    function renderLocalOpenHistory() {
+    async function fetchAndShowOpenedResults() {
         const grid = document.getElementById('historyGrid');
-        const list = JSON.parse(localStorage.getItem('my_opened_videos') || '[]');
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px;">טוען נתונים...</div>';
         
-        if (list.length === 0) {
-            grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:var(--text-muted); font-size: 16px; font-weight: 600;">טרם נשמרו סרטונים פתוחים מקומית.<br>התחל לחפש וסרטונים שיזוהו כפתוחים יישמרו כאן אוטומטית.</div>';
+        let displayList = [];
+
+        // אם מחובר - מושך ממסד הנתונים
+        if (currentUser) {
+            try {
+                const { data, error } = await supabaseClient.from('user_open_videos').select('*').eq('user_id', currentUser.id).order('saved_at', { ascending: false }).limit(100);
+                if (!error && data) {
+                    displayList = data.map(v => ({ id: v.video_id, title: v.title, thumb: v.thumbnail_url, date: v.saved_at }));
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        // אם לא מחובר או שאין נתונים בענן, משתמש בזיכרון המקומי
+        if (displayList.length === 0) {
+            displayList = JSON.parse(localStorage.getItem('my_opened_videos') || '[]');
+        }
+        
+        if (displayList.length === 0) {
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:var(--text-muted); font-size: 16px; font-weight: 600;">טרם נמצאו סרטונים פתוחים בחיפושים שלך.<br>התחל לחפש וכל תוצאה פתוחה תישמר כאן אוטומטית (ובענן אם אתה מחובר).</div>';
             return;
         }
         
-        list.forEach(v => {
+        grid.innerHTML = '';
+        displayList.forEach(v => {
             const dateStr = new Date(v.date).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' });
             const card = document.createElement('div');
             card.className = 'card clickable'; card.dataset.vid = v.id; card.dataset.title = v.title; card.dataset.thumb = v.thumb;
