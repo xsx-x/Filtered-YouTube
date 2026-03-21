@@ -17,6 +17,13 @@
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+    <script>
+        // תיקון אוניברסלי לקריסות סקריפטים של חברות סינון (כמו באג ה-writeEmbed של נטספארק/אתרוג)
+        if (typeof window.writeEmbed === 'undefined') {
+            window.writeEmbed = function() { console.warn('Bypassed NetSpark/Etrog internal bug.'); };
+        }
+    </script>
+
     <style>
         /* ================= משתני עיצוב ומצב לילה ================= */
         :root {
@@ -407,8 +414,8 @@
         }
         .netfree-detected-banner.show { transform: translateX(-50%) translateY(0); }
 
-        /* אלמנטים נסתרים */
-        #hidden-checker { position: fixed; top: -2000px; left: -2000px; width: 100px; height: 100px; opacity: 0; pointer-events: none; }
+        /* אלמנטים נסתרים - עם z-index נמוך כדי למנוע הסתרת תוכן */
+        #hidden-checker { position: fixed; top: -2000px; left: -2000px; width: 100px; height: 100px; opacity: 0; pointer-events: none; z-index: -1; }
         
         .footer { text-align: center; padding: 50px 20px; color: var(--text-muted); font-size: 14px; font-weight: 600; margin-top: 40px; border-top: 1px solid var(--border-color); }
         .footer a { color: var(--primary); text-decoration: none; font-weight: bold; }
@@ -951,7 +958,6 @@
 
     // ================= חיפוש =================
     async function handleSearch(isLoadMore = false, forceChannelId = null) {
-        // הסרנו את התלות ב-isYTReady כדי למנוע חסימה אם הסינון חוסם את הסקריפט של יוטיוב!
         
         const searchType = document.querySelector('input[name="searchType"]:checked').value;
         const queryInput = document.getElementById('searchInput').value.trim();
@@ -1082,12 +1088,8 @@
                 else finalizeStatus(videoId, 'netfree_pending', title, false);
             } catch (e) { finalizeStatus(videoId, 'netfree_pending', title, false); }
         } else {
-            // אם סקריפט ה-API נחסם לחלוטין - נניח שהסרטון בבדיקה / סומן כפתוח כברירת מחדל כדי שהמשתמש יוכל לנסות לנגן אותו
-            if (typeof YT === 'undefined' || !YT.Player) {
-                finalizeStatus(videoId, 'unverified', title, false); 
-            } else {
-                await deepPlayerCheck(videoId, title);
-            }
+            // החזרנו את הבדיקה האוטומטית לכל חברות הסינון עם מנגנון Iframe חסין
+            await deepPlayerCheck(videoId, title);
         }
     }
 
@@ -1102,6 +1104,7 @@
         }, 1000);
     }
 
+    // בדיקה עמוקה שמבוססת על Iframe ישיר ותקשורת Raw PostMessage (עוקף באגים של סינונים שוברי API)
     function deepPlayerCheck(videoId, title) {
         return new Promise((resolve) => {
             const divId = `check-${videoId}`;
@@ -1109,30 +1112,48 @@
             document.getElementById('hidden-checker').appendChild(checkDiv);
 
             let resolved = false;
-            let player;
             
-            try {
-                player = new YT.Player(divId, {
-                    videoId: videoId, playerVars: { 'autoplay': 1, 'mute': 1 },
-                    events: {
-                        'onReady': (e) => e.target.playVideo(),
-                        'onStateChange': (e) => { if (!resolved && (e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.BUFFERING)) { resolved = true; cleanup(true); } },
-                        'onError': () => { if (!resolved) { resolved = true; cleanup(false); } }
+            const iframe = document.createElement('iframe');
+            iframe.width = '100'; 
+            iframe.height = '100';
+            iframe.allow = "autoplay";
+            iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1&playsinline=1`;
+            checkDiv.appendChild(iframe);
+
+            const messageListener = (e) => {
+                if (resolved) return;
+                try {
+                    const data = JSON.parse(e.data);
+                    
+                    // כשהנגן מוכן, נשלח פקודת play למקרה שה-autoplay לא עבד
+                    if (data.event === 'onReady') {
+                        iframe.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'playVideo'}), '*');
                     }
-                });
-            } catch(e) {
-                // Fallback במקרה של קריסה עקב חסימת ה-API של רימון/אתרוג
-                if (!resolved) { resolved = true; cleanup('unverified'); } 
-            }
-            
+                    
+                    // סטטוס 1 (Playing) או 3 (Buffering) אומר שהסרטון נטען ולא נחסם!
+                    if (data.info && (data.info.playerState === 1 || data.info.playerState === 3)) {
+                        resolved = true;
+                        cleanup(true);
+                    }
+                } catch(err) {}
+            };
+
+            window.addEventListener('message', messageListener);
+
             const timeout = setTimeout(() => { 
                 if (!resolved) { 
                     resolved = true; 
-                    const isProbFilter = ['Etrog', 'Rimon', 'NetSpark', 'KosherSmartphone'].includes(detectedFilter);
-                    cleanup(isProbFilter ? 'unverified' : false); 
+                    cleanup(false); // פקע הזמן ללא תגובה תקינה מיוטיוב = נחסם ע"י הסינון
                 } 
             }, dynamicCheckTimeout);
-            function cleanup(isOpen) { clearTimeout(timeout); try { if(player && player.destroy) player.destroy(); document.getElementById(divId)?.remove(); } catch(err){} finalizeStatus(videoId, isOpen === 'unverified' ? 'unverified' : (isOpen ? 'open' : 'blocked'), title, isOpen === true); resolve(); }
+            
+            function cleanup(isOpen) { 
+                clearTimeout(timeout); 
+                window.removeEventListener('message', messageListener);
+                try { checkDiv.remove(); } catch(err){} 
+                finalizeStatus(videoId, isOpen ? 'open' : 'blocked', title, true); 
+                resolve(); 
+            }
         });
     }
 
@@ -1174,12 +1195,6 @@
             saveToUserOpenVideos(videoId, title, thumbUrl); 
             
             if (saveToDB && detectedFilter !== 'Unknown' && detectedFilter !== 'None') saveToGlobalIndex(videoId, title, true);
-        } else if (status === 'unverified') {
-            tag.innerText = "נסה להפעיל"; tag.className = "status-badge status-pending";
-            tag.style.background = "rgba(59, 130, 246, 0.95)"; tag.style.borderColor = "#2563eb";
-            card.classList.add('clickable'); card.onclick = () => openPlayerModal(videoId, title, thumbUrl);
-            document.getElementById('openGrid').appendChild(card);
-            // מציג למשתמשי אתרוג/רימון אך לא שומר לדאטאבייס העולמי כאומת פתוח!
         } else if (status === 'netfree_pending') {
             tag.innerText = "טרם נבדק"; tag.className = "status-badge status-pending";
             card.classList.add('clickable'); card.onclick = () => openPlayerModal(videoId, title, thumbUrl);
@@ -1230,7 +1245,7 @@
         }
     }
 
-    // פונקציית מעקף - Fallback במקרה שסינון שובר את ה-API של יוטיוב
+    // פונקציית מעקף - Fallback במקרה שסינון שובר את ה-API של יוטיוב בנגן הקדמי
     function createRawIframeFallback(container, videoId) {
         container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1" width="100%" height="100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
     }
@@ -1257,7 +1272,7 @@
         
         const isProblematicFilter = ['Etrog', 'Rimon', 'NetSpark', 'KosherSmartphone'].includes(detectedFilter);
         
-        // יצירת הנגן עם עקיפה מוחלטת של ה-API לסינונים הבעייתיים
+        // יצירת הנגן הקדמי - גם פה מגן מבאגים מול חברות סינון
         if (!isProblematicFilter && typeof YT !== 'undefined' && YT.Player) {
             try {
                 ytModalPlayer = new YT.Player('playerContainer', {
@@ -1268,7 +1283,6 @@
                     events: {
                         'onStateChange': onModalPlayerStateChange,
                         'onError': (e) => { 
-                            // אם יוטיוב זורק שגיאת הפעלה, נעבור למעקף ה-Iframe
                             createRawIframeFallback(containerWrapper, videoId); 
                         }
                     }
@@ -1277,7 +1291,6 @@
                 createRawIframeFallback(containerWrapper, videoId);
             }
         } else {
-            // ה-API חסום (כמו באתרוג) - יצירת Iframe רגיל כדי שהסרטון יוכל לעבוד
             createRawIframeFallback(containerWrapper, videoId);
         }
 
