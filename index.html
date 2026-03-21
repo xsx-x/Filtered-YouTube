@@ -403,6 +403,8 @@
         .filter-banner select { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--bg-body); font-size: 15px; font-weight: 600; outline: none; }
         .filter-banner button { width: 100%; background: var(--primary); color: white; padding: 12px; border-radius: 10px; font-weight: 700; font-size: 15px; }
         .filter-banner button:hover { background: var(--primary-hover); }
+        .close-banner-btn { position: absolute; top: 15px; left: 15px; width: auto !important; padding: 5px !important; background: transparent !important; color: var(--text-muted) !important; border: none; font-size: 18px; line-height: 1; }
+        .close-banner-btn:hover { color: var(--danger) !important; background: transparent !important; transform: scale(1.1); }
 
         .netfree-detected-banner {
             position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-150%);
@@ -446,6 +448,7 @@
 
 <!-- באנר בחירת סינון -->
 <div id="filterSelectionBanner" class="filter-banner">
+    <button class="close-banner-btn" onclick="closeFilterBanner()" title="סגור">✖</button>
     <h3>🛡️ אנא בחר את הסינון שלך</h3>
     <p>כדי שנוכל להציג לך תוצאות מדויקות ושמירות מהמאגר, נשמח לדעת באיזה סינון אתה משתמש.</p>
     <select id="userFilterSelect">
@@ -735,6 +738,10 @@
     }
 
     // ================= זיהוי סינון ובאנרים =================
+    function closeFilterBanner() {
+        document.getElementById('filterSelectionBanner').classList.remove('show');
+    }
+
     async function initSystem() {
         const savedFilter = localStorage.getItem('userSelectedFilter');
         let isNetfreeEnv = false;
@@ -746,13 +753,14 @@
                 // בדיקת שגיאות ה-CORS כאן מטופלות ולא תוקעות את האתר
                 const response = await fetch('https://netfree.link/api/user', { cache: 'no-store' });
                 if(response.ok) isNetfreeEnv = true;
-            } catch (e) { } // שגיאת רשת (כמו CORS) תיתפס כאן
+            } catch (e) { console.warn("NetFree auto-detect blocked or unavailable"); } // שגיאת רשת (כמו CORS) תיתפס כאן
         }
 
         if (isNetfreeEnv) {
             detectedFilter = 'NetFree';
             localStorage.setItem('userSelectedFilter', 'NetFree');
             document.getElementById('btnNetFreeDeepCheck').style.display = 'inline-flex';
+            document.getElementById('filterSelectionBanner').classList.remove('show'); // ודא שהבאנר סגור
             
             const nfBanner = document.getElementById('netfreeDetectedBanner');
             nfBanner.classList.add('show');
@@ -1169,10 +1177,11 @@
         // שמירה לענן בחשבון המשתמש אם הוא מחובר
         if (!currentUser) return;
         try {
-            await supabaseClient.from('user_open_videos').upsert([
+            const { error } = await supabaseClient.from('user_open_videos').upsert([
                 { user_id: currentUser.id, video_id: id, title: title, thumbnail_url: thumb, filter_provider: detectedFilter }
             ], { onConflict: 'user_id, video_id' });
-        } catch(e) { console.error("Could not save to user_open_videos DB", e); }
+            if (error) console.warn("DB Warning:", error.message);
+        } catch(e) { console.warn("DB Table missing, saved locally only."); }
     }
 
     function finalizeStatus(videoId, status, title, saveToDB) {
@@ -1393,10 +1402,12 @@
         if (currentUser) {
             try {
                 const { data, error } = await supabaseClient.from('user_open_videos').select('*').eq('user_id', currentUser.id).order('saved_at', { ascending: false }).limit(100);
-                if (!error && data) {
+                if (error) {
+                    console.warn("DB Warning: user_open_videos table might be missing.");
+                } else if (data) {
                     displayList = data.map(v => ({ id: v.video_id, title: v.title, thumb: v.thumbnail_url, date: v.saved_at }));
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { console.warn("DB fetch error, falling back to local storage."); }
         }
 
         // אם לא מחובר או שאין נתונים בענן, משתמש בזיכרון המקומי
