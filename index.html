@@ -182,6 +182,7 @@
         .db-marquee-container {
             display: flex; flex-direction: column; gap: 15px; overflow: hidden; position: relative;
             padding: 10px 0; mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+            transition: opacity 0.6s ease;
         }
 
         .db-marquee-row { display: flex; gap: 15px; width: max-content; }
@@ -345,9 +346,9 @@
         .minimize-btn:hover { background: var(--primary); border-color: var(--primary); }
         
         .external-yt-btn {
-            background: linear-gradient(135deg, #ef4444, #b91c1c); color: white; padding: 10px 18px; font-size: 14px; text-decoration: none; border-radius: 10px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 6px; font-weight: 800; transition: 0.3s;
+            background: transparent; color: var(--text-muted); padding: 6px 12px; font-size: 12px; text-decoration: none; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 5px; font-weight: 600; transition: 0.3s;
         }
-        .external-yt-btn:hover { transform: scale(1.05); box-shadow: var(--shadow-md); color: white; }
+        .external-yt-btn:hover { background: var(--bg-body); color: var(--text-main); border-color: var(--text-muted); }
 
         /* ================= מיני נגן (Mini Player) ================= */
         .modal-overlay.mini-player-mode {
@@ -602,7 +603,7 @@
         <div class="modal-header">
             <!-- כפתור פתיחה חיצוני לפתרון באגים של חברות סינון -->
             <a id="externalYtLink" href="#" target="_blank" class="external-yt-btn">
-                🔗 לא עובד? פתח ישירות ביוטיוב
+                🔗 צפה ישירות ביוטיוב
             </a>
             <div style="display: flex; gap: 12px;">
                 <button class="minimize-btn" id="minimizeBtn" onclick="toggleMiniPlayer()">🔽 מזער</button>
@@ -817,10 +818,11 @@
 
     // ================= מאגר סרטונים בחלון הגדול =================
     let allShowcaseVideos = [];
+    let dbShowcaseOffset = 0;
+    let dbShowcaseTimer = null;
 
     async function loadDatabaseShowcase() {
         const showcaseWrapper = document.getElementById('dbShowcase');
-        const container = document.getElementById('dbMarqueeContainer');
         const titleSpan = document.getElementById('showcaseFilterName');
         
         titleSpan.innerText = detectedFilter === 'NetFree' ? 'נטפרי' : 
@@ -832,17 +834,45 @@
             return;
         }
 
+        dbShowcaseOffset = 0;
+        fetchShowcaseBatch();
+    }
+
+    async function fetchShowcaseBatch() {
+        clearTimeout(dbShowcaseTimer);
+        const query = document.getElementById('dbSearchInput').value.trim();
+        if (query) return; // לא לבצע רענון אוטומטי כשמשתמש מחפש
+
         try {
             const { data } = await supabaseClient.from('videos').select('*')
                 .eq('status', 'open').eq('filter_provider', detectedFilter)
-                .order('updated_at', { ascending: false }).limit(100);
+                .order('updated_at', { ascending: false })
+                .range(dbShowcaseOffset, dbShowcaseOffset + 99); // תמיד מושך 100
             
-            if (data && data.length > 10) {
+            if (data && data.length > 0) {
                 allShowcaseVideos = data;
-                showcaseWrapper.style.display = 'block';
-                renderDbShowcase(allShowcaseVideos);
+                document.getElementById('dbShowcase').style.display = 'block';
+                
+                // אפקט עמעום במעבר
+                const container = document.getElementById('dbMarqueeContainer');
+                container.style.opacity = 0;
+                
+                setTimeout(() => {
+                    renderDbShowcase(data);
+                    container.style.opacity = 1;
+                }, 500);
+
+                dbShowcaseOffset += 100;
+                
+                // מריץ את הפונקציה שוב בעוד 40 שניות (זמן של מחזור אנימציה אחד)
+                dbShowcaseTimer = setTimeout(fetchShowcaseBatch, 40000);
+                
+            } else if (dbShowcaseOffset > 0) {
+                // אם הגענו לסוף הרשימה, מתחילים שוב מההתחלה!
+                dbShowcaseOffset = 0;
+                fetchShowcaseBatch();
             } else {
-                showcaseWrapper.style.display = 'none';
+                document.getElementById('dbShowcase').style.display = 'none';
             }
         } catch(e) { console.error("Error loading showcase:", e); }
     }
@@ -880,9 +910,13 @@
     }
 
     function filterDbShowcase() {
+        clearTimeout(dbShowcaseTimer); // לעצור רענון אוטומטי בזמן חיפוש
         const query = document.getElementById('dbSearchInput').value.toLowerCase();
+        
         if(!query) {
             renderDbShowcase(allShowcaseVideos);
+            // מחדש את הרענון האוטומטי
+            dbShowcaseTimer = setTimeout(fetchShowcaseBatch, 40000); 
             return;
         }
         
@@ -1093,6 +1127,8 @@
             while (index < items.length) {
                 const item = items[index++];
                 await asyncFn(item);
+                // השהייה קלה של 300 מ"ש בין בדיקה לבדיקה למנוע קריסת דפדפן בערוצים גדולים
+                await new Promise(r => setTimeout(r, 300));
             }
         }
         const workers = [];
@@ -1146,7 +1182,8 @@
             iframe.width = '100'; 
             iframe.height = '100';
             iframe.allow = "autoplay";
-            iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1&playsinline=1`;
+            // שימוש בכתובת nocookie פותרת חלק מבעיות הטעינה ברקע
+            iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1&playsinline=1`;
             checkDiv.appendChild(iframe);
 
             const messageListener = (e) => {
@@ -1154,13 +1191,9 @@
                 try {
                     const data = JSON.parse(e.data);
                     
-                    // כשהנגן מוכן, נשלח פקודת play למקרה שה-autoplay לא עבד
-                    if (data.event === 'onReady') {
-                        iframe.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'playVideo'}), '*');
-                    }
-                    
-                    // סטטוס 1 (Playing) או 3 (Buffering) אומר שהסרטון נטען ולא נחסם!
-                    if (data.info && (data.info.playerState === 1 || data.info.playerState === 3)) {
+                    // מספיק שקיבלנו 'onReady' או 'infoDelivery' - זה אומר שהדף של יוטיוב עלה ולא עמוד החסימה של הסינון!
+                    // זה פותר את הבעיה בבדיקת ערוצים כשהדפדפן חוסם ניגון אוטומטי
+                    if (data.event === 'onReady' || data.event === 'infoDelivery') {
                         resolved = true;
                         cleanup(true);
                     }
@@ -1172,7 +1205,7 @@
             const timeout = setTimeout(() => { 
                 if (!resolved) { 
                     resolved = true; 
-                    cleanup(false); // פקע הזמן ללא תגובה תקינה מיוטיוב = נחסם ע"י הסינון
+                    cleanup(false); // פקע הזמן ללא תגובה תקינה מיוטיוב = נחסם ע"י הסינון או שהדפדפן חנק את הבקשה
                 } 
             }, dynamicCheckTimeout);
             
