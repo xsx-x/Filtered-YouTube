@@ -18,7 +18,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
-        // תיקון אוניברסלי לקריסות סקריפטים של חברות סינון (כמו באג ה-writeEmbed של נטספארק/אתרוג)
+        // תיקון אוניברסלי לקריסות סקריפטים של חברות סינון
         if (typeof window.writeEmbed === 'undefined') {
             window.writeEmbed = function() { console.warn('Bypassed NetSpark/Etrog internal bug.'); };
         }
@@ -83,7 +83,8 @@
 
         /* ================= עיצוב דשבורד חדש (Sidebar & Top Bar) ================= */
         @media (min-width: 1025px) {
-            body { padding: 30px 320px 30px 30px !important; /* רווח לימין עבור התפריט */ }
+            body { padding: 30px 320px 30px 30px !important; transition: padding 0.3s ease; }
+            body.sidebar-minimized { padding: 30px 120px 30px 30px !important; }
         }
 
         .dashboard-sidebar {
@@ -91,12 +92,22 @@
             background: var(--bg-glass); border-left: 1px solid var(--border-color);
             backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
             padding: 30px 20px; display: flex; flex-direction: column; z-index: 100;
-            box-shadow: -4px 0 15px rgba(0,0,0,0.03); overflow-y: auto;
+            box-shadow: -4px 0 15px rgba(0,0,0,0.03); overflow-x: hidden; transition: width 0.3s ease, padding 0.3s ease;
         }
+
+        /* כפתור מזעור התפריט */
+        .sidebar-toggle-btn {
+            position: absolute; top: 15px; left: 15px; background: var(--bg-card);
+            border: 1px solid var(--border-color); border-radius: 50%; width: 34px; height: 34px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            box-shadow: var(--shadow-sm); z-index: 10; color: var(--text-main); transition: 0.3s;
+            font-size: 14px;
+        }
+        .sidebar-toggle-btn:hover { background: var(--primary); color: white; transform: scale(1.1); }
 
         .logo-area { display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; transition: transform 0.3s; margin-bottom: 40px; }
         .logo-area:hover { transform: scale(1.05); }
-        .logo-area h1 { font-size: 2.2em; font-weight: 900; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px; }
+        .logo-area h1 { font-size: 2.2em; font-weight: 900; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px; transition: 0.3s; }
 
         .sidebar-nav { display: flex; flex-direction: column; gap: 12px; }
         .sidebar-nav button {
@@ -104,9 +115,18 @@
             padding: 14px 18px; border-radius: var(--radius-md); font-weight: 700; font-size: 15px;
             display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.3s;
             box-shadow: var(--shadow-sm); outline: none; text-align: right; justify-content: flex-start;
+            white-space: nowrap;
         }
         .sidebar-nav button:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--primary); }
         .sidebar-nav button.active-nav { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border-color: transparent; box-shadow: var(--shadow-md); }
+
+        /* מצב תפריט ממוזער */
+        .dashboard-sidebar.minimized { width: 90px; padding: 30px 10px; }
+        .dashboard-sidebar.minimized .logo-area h1 { font-size: 1em; text-align: center; }
+        .dashboard-sidebar.minimized .logo-area p { display: none; }
+        .dashboard-sidebar.minimized .sidebar-nav button .nav-text { display: none; }
+        .dashboard-sidebar.minimized .sidebar-nav button { padding: 14px 0; justify-content: center; }
+        .dashboard-sidebar.minimized .sidebar-toggle-btn { transform: rotate(180deg); left: 28px; }
 
         .top-bar-fixed {
             position: fixed; top: 20px; left: 30px; z-index: 100;
@@ -167,7 +187,7 @@
         }
         .btn-search:hover:not(:disabled) { transform: translateY(-3px) scale(1.02); box-shadow: var(--shadow-lg); background: linear-gradient(135deg, var(--primary-hover), var(--primary)); }
 
-        /* ================= חלונית מאגר הסרטונים הפתוחים (DB Showcase) ================= */
+        /* ================= חלונית מאגר הסרטונים הפתוחים ================= */
         .db-showcase-wrapper {
             max-width: 1400px; margin: 0 auto 50px auto; width: 100%;
             background: var(--bg-glass); backdrop-filter: blur(16px);
@@ -192,7 +212,6 @@
         }
 
         .db-marquee-row { display: flex; gap: 15px; width: max-content; }
-        /* האטת מהירות הגלילה כפי שנתבקש */
         .db-marquee-row.scroll-right { animation: scrollRight 80s linear infinite; }
         .db-marquee-row.scroll-left { animation: scrollLeft 70s linear infinite; }
         .db-marquee-container:hover .db-marquee-row { animation-play-state: paused; }
@@ -222,12 +241,13 @@
         .section-blocked { grid-area: blocked; min-width: 0; }
 
         @media (max-width: 1024px) {
-            body { padding: 90px 15px 90px 15px !important; } /* מקום לתפריט העליון והתחתון */
+            body { padding: 90px 15px 90px 15px !important; }
             .dashboard-sidebar {
                 position: fixed; bottom: 0; left: 0; right: 0; top: auto; width: 100%; height: auto;
                 flex-direction: row; justify-content: space-around; padding: 10px; z-index: 1000;
                 border-top: 1px solid var(--border-color); border-left: none; box-shadow: 0 -5px 15px rgba(0,0,0,0.05);
             }
+            .dashboard-sidebar .sidebar-toggle-btn { display: none; }
             .dashboard-sidebar .logo-area { display: none; }
             .dashboard-sidebar .sidebar-nav { flex-direction: row; gap: 5px; width: 100%; justify-content: center; }
             .dashboard-sidebar .sidebar-nav button { padding: 10px; font-size: 13px; flex: 1; justify-content: center; flex-direction: column; gap: 5px; text-align: center; }
@@ -452,20 +472,23 @@
 <body>
 
 <!-- דשבורד: תפריט ניווט ימני קבוע -->
-<aside class="dashboard-sidebar">
+<aside class="dashboard-sidebar" id="mainSidebar">
+    <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="מזער/הגדל תפריט">
+        ▶
+    </button>
     <div class="logo-area" onclick="window.location.reload()">
         <h1>יו-טוב</h1>
         <p style="color: var(--text-muted); font-size: 13px; font-weight: 600;">מנוע וידאו מסונן</p>
     </div>
     <nav class="sidebar-nav">
         <button onclick="switchMainTab('search')" id="nav-search" class="active-nav">
-            <span style="font-size: 20px;">🔍</span> חיפוש ראשי
+            <span style="font-size: 20px;">🔍</span> <span class="nav-text">חיפוש ראשי</span>
         </button>
         <button onclick="switchMainTab('watched')" id="nav-history-watched">
-            <span style="font-size: 20px;">👁️</span> היסטוריית צפיות
+            <span style="font-size: 20px;">👁️</span> <span class="nav-text">היסטוריית צפיות</span>
         </button>
         <button onclick="switchMainTab('opened')" id="nav-history-opened">
-            <span style="font-size: 20px;">✅</span> היסטוריית פתוחים
+            <span style="font-size: 20px;">✅</span> <span class="nav-text">היסטוריית פתוחים</span>
         </button>
     </nav>
 </aside>
@@ -594,7 +617,7 @@
         <div style="display: flex; align-items: center; gap: 12px;">
             <span id="historyTitleIcon">🕒</span> <span id="historyTitleText">היסטוריה</span>
         </div>
-        <!-- שדה חיפוש בהיסטוריה (סעיף 4) -->
+        <!-- שדה חיפוש בהיסטוריה -->
         <input type="text" id="historySearchInput" placeholder="🔍 חפש בתוצאות אלו..." onkeyup="filterHistory()" class="db-search-input" style="max-width: 300px; padding: 10px 20px;">
     </div>
 
@@ -670,6 +693,19 @@
 </div>
 
 <script>
+    // מזעור תפריט
+    function toggleSidebar() {
+        const sidebar = document.getElementById('mainSidebar');
+        sidebar.classList.toggle('minimized');
+        document.body.classList.toggle('sidebar-minimized');
+        localStorage.setItem('sidebarMin', sidebar.classList.contains('minimized'));
+    }
+
+    if(localStorage.getItem('sidebarMin') === 'true') {
+        document.getElementById('mainSidebar').classList.add('minimized');
+        document.body.classList.add('sidebar-minimized');
+    }
+
     // סגירת חלונות בלחיצה על הרקע השחור מסביב
     document.getElementById('videoModal').addEventListener('click', function(e) {
         if (e.target === this && !this.classList.contains('mini-player-mode')) {
@@ -681,9 +717,7 @@
     window.addEventListener('message', function(e) {
         try {
             const data = JSON.parse(e.data);
-            // playerState 0 = Ended (הסתיים)
             if (data.event === 'infoDelivery' && data.info && data.info.playerState === 0) {
-                // ודא שהמודל הראשי אכן פתוח כדי לא להקפיץ שיר מסרטונים שברקע הבדיקה
                 const modal = document.getElementById('videoModal');
                 if (modal && modal.classList.contains('active')) {
                     playNextVideo();
@@ -723,22 +757,16 @@
     let currentPlayingVideoId = null;
     let apiRetryCount = 0; 
 
-    // סעיף 1: מערכת ניווט חדשה לדשבורד
+    // מערכת ניווט חדשה לדשבורד
     function switchMainTab(view) {
-        // סימון הלשונית הפעילה בתפריט הצד
         document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active-nav'));
-
-        document.getElementById('historySearchInput').value = ''; // ניקוי חיפוש קודם בהיסטוריה
+        document.getElementById('historySearchInput').value = ''; 
 
         if (view === 'search') {
             document.getElementById('nav-search').classList.add('active-nav');
             document.getElementById('view-history').style.display = 'none';
             document.getElementById('view-search').style.display = 'block';
-            
-            // תצוגת דברים בחיפוש לפי הסטטוס הקודם
-            if (currentQuery === '' && !currentChannelId) {
-                document.getElementById('dbShowcase').style.display = 'block';
-            }
+            if (currentQuery === '' && !currentChannelId) document.getElementById('dbShowcase').style.display = 'block';
         } 
         else if (view === 'watched') {
             document.getElementById('nav-history-watched').classList.add('active-nav');
@@ -746,7 +774,6 @@
             document.getElementById('view-history').style.display = 'block';
             document.getElementById('historyTitleIcon').innerText = '👁️';
             document.getElementById('historyTitleText').innerText = 'היסטוריית צפיות';
-            
             fetchAndShowHistory(false);
         } 
         else if (view === 'opened') {
@@ -755,23 +782,17 @@
             document.getElementById('view-history').style.display = 'block';
             document.getElementById('historyTitleIcon').innerText = '✅';
             document.getElementById('historyTitleText').innerText = 'היסטוריית פתוחים שזוהו אצלי';
-            
             fetchAndShowOpenedResults();
         }
     }
 
-    // סעיף 4: פונקציית סינון בתוך ההיסטוריה האישית
     function filterHistory() {
         const query = document.getElementById('historySearchInput').value.toLowerCase();
         const cards = document.querySelectorAll('#historyGrid .card');
         
         cards.forEach(card => {
             const title = card.dataset.title ? card.dataset.title.toLowerCase() : '';
-            if (title.includes(query)) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
-            }
+            card.style.display = title.includes(query) ? 'block' : 'none';
         });
     }
 
@@ -836,9 +857,10 @@
             isNetfreeEnv = true;
         } else {
             try {
+                // אנו עוטפים את הבדיקה ב-catch כדי שלא תפריע במידה ויש חסימת CORS תקינה כשלא בנטפרי
                 const response = await fetch('https://netfree.link/api/user', { cache: 'no-store' });
                 if(response.ok) isNetfreeEnv = true;
-            } catch (e) { console.warn("NetFree auto-detect blocked or unavailable"); } 
+            } catch (e) { /* התעלמות מכוונת מקריסת ה-CORS כאן. */ } 
         }
 
         if (isNetfreeEnv) {
@@ -903,7 +925,7 @@
     async function fetchShowcaseBatch() {
         clearTimeout(dbShowcaseTimer);
         const query = document.getElementById('dbSearchInput').value.trim();
-        if (query) return; // לא לבצע רענון אוטומטי כשמשתמש מחפש משהו ספציפי
+        if (query) return;
 
         try {
             const { data } = await supabaseClient.from('videos').select('*')
@@ -913,7 +935,6 @@
             
             if (data && data.length > 0) {
                 document.getElementById('dbShowcase').style.display = 'block';
-                
                 const container = document.getElementById('dbMarqueeContainer');
                 container.style.opacity = 0;
                 
@@ -924,7 +945,6 @@
 
                 dbShowcaseOffset += 100;
                 dbShowcaseTimer = setTimeout(fetchShowcaseBatch, 40000);
-                
             } else if (dbShowcaseOffset > 0) {
                 dbShowcaseOffset = 0;
                 fetchShowcaseBatch();
@@ -950,7 +970,6 @@
 
         rows.forEach((rowVideos, rowIndex) => {
             if(rowVideos.length === 0) return;
-            
             const rowDiv = document.createElement('div');
             rowDiv.className = `db-marquee-row ${rowIndex % 2 === 0 ? 'scroll-right' : 'scroll-left'}`;
             
@@ -966,7 +985,6 @@
         });
     }
 
-    // סעיף 5: חיפוש אמיתי במסד הנתונים בחלונית "הסרט הנע" (Supabase ilike)
     async function filterDbShowcase() {
         clearTimeout(dbShowcaseTimer); 
         const query = document.getElementById('dbSearchInput').value.trim();
@@ -978,7 +996,6 @@
         }
 
         try {
-            // חיפוש בשרת לפי מילת מפתח (מוגבל ל-100 תוצאות רלוונטיות)
             const { data } = await supabaseClient.from('videos').select('*')
                 .eq('status', 'open').eq('filter_provider', detectedFilter)
                 .ilike('title', `%${query}%`)
@@ -1169,7 +1186,6 @@
             fullCard.dataset.title = title; fullCard.dataset.thumb = thumb; fullCard.dataset.vid = id;
             fullCard.innerHTML = `<div id="status-${id}" class="status-badge status-pending">ממתין...</div><div class="thumb-wrap"><img src="${thumb}"><div class="play-btn">&#9658;</div></div><div class="card-body"><h3>${title}</h3><div class="card-meta"><span>📺 ${v.snippet.channelTitle}</span><span>📅 ${formatDate(v.snippet.publishedAt)}</span></div></div>`;
             
-            // הכנסה למיכל אקראי ולא למסך כדי לשמור על האובייקט
             document.body.appendChild(fullCard);
             fullCard.style.position = 'absolute'; fullCard.style.top = '-9999px';
 
@@ -1218,7 +1234,6 @@
                 else finalizeStatus(videoId, 'netfree_pending', title, false);
             } catch (e) { finalizeStatus(videoId, 'netfree_pending', title, false); }
         } else {
-            // סעיפים 6+7: בדיקה דרך משבצת על המסך (שקיפות 0.01) והמתנה לסטטוס ניגון/אגירה אמיתי
             await deepPlayerCheck(videoId, title);
         }
     }
@@ -1241,16 +1256,16 @@
 
             let resolved = false;
 
-            // יצירת הנגן ישירות במשבצת שעל המסך
+            // החזרה ליוטיוב Nocookie לפתרון באג התרסקות הקוד הפנימי של הסינון
             const iframe = document.createElement('iframe');
             iframe.width = '100%'; 
             iframe.height = '100%';
             iframe.allow = "autoplay";
-            iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1&playsinline=1`;
+            iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1&playsinline=1`;
             iframe.style.position = 'absolute';
             iframe.style.top = '0';
             iframe.style.left = '0';
-            iframe.style.opacity = '0.01'; // כמעט שקוף לחלוטין - עוקף את חסימת ה-Timeout של הדפדפנים
+            iframe.style.opacity = '0.01'; 
             iframe.style.zIndex = '5';
             iframe.style.pointerEvents = 'none';
 
@@ -1261,15 +1276,13 @@
                 try {
                     const data = JSON.parse(e.data);
                     
-                    // מתעלם לחלוטין מ-onReady שקרי של מסגרת יוטיוב, וממתין לסטטוס ניגון או אגירה אמיתי
                     if (data.event === 'infoDelivery' && data.info && data.info.playerState !== undefined) {
                         const state = data.info.playerState;
-                        if (state === 1 || state === 3) { // 1 = playing, 3 = buffering
+                        if (state === 1 || state === 3) { 
                             resolved = true;
                             cleanup(true);
                         }
                     }
-                    // זיהוי חסימה של אתרוג או נטספארק שזורקים שגיאת נגן פנימית (error או onError)
                     else if (data.event === 'onError' || data.event === 'error') {
                         resolved = true;
                         cleanup(false);
@@ -1282,7 +1295,7 @@
             const timeout = setTimeout(() => { 
                 if (!resolved) { 
                     resolved = true; 
-                    cleanup(false); // פקע הזמן = חסום (או שהרשת חנקה את הבקשה)
+                    cleanup(false); 
                 } 
             }, dynamicCheckTimeout);
             
@@ -1339,7 +1352,11 @@
             card.classList.add('clickable'); card.onclick = () => openPlayerModal(videoId, title, thumbUrl);
             document.getElementById('blockedRow').appendChild(card);
         } else {
+            // טיפול בלחיצה על הסרטונים החסומים - יפתח ישירות ביוטיוב
             tag.innerText = "חסום"; tag.className = "status-badge status-blocked";
+            card.classList.add('clickable');
+            card.title = "לחץ לפתיחה ישירה ביוטיוב (לשונית חדשה)";
+            card.onclick = () => window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
             document.getElementById('blockedRow').appendChild(card);
         }
     }
@@ -1401,7 +1418,8 @@
     }
 
     function createRawIframeFallback(container, videoId) {
-        container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1" width="100%" height="100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+        // החזרה לכתובת nocookie פותרת התרסקויות תחת סינון 
+        container.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1" width="100%" height="100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
     }
 
     async function openPlayerModal(videoId, title, imgUrl) {
@@ -1431,6 +1449,8 @@
         
         const isProblematicFilter = ['Etrog', 'Rimon', 'NetSpark', 'KosherSmartphone'].includes(detectedFilter);
         
+        let playerReadyOrError = false;
+
         if (!isProblematicFilter && typeof YT !== 'undefined' && YT.Player) {
             try {
                 ytModalPlayer = new YT.Player('playerContainer', {
@@ -1439,12 +1459,26 @@
                     videoId: videoId,
                     playerVars: { 'autoplay': 1, 'rel': 0 },
                     events: {
-                        'onStateChange': onModalPlayerStateChange,
+                        'onReady': () => { playerReadyOrError = true; },
+                        'onStateChange': (event) => {
+                            playerReadyOrError = true;
+                            onModalPlayerStateChange(event);
+                        },
                         'onError': (e) => { 
+                            playerReadyOrError = true;
                             createRawIframeFallback(containerWrapper, videoId); 
                         }
                     }
                 });
+
+                // כלב שמירה - אם הנגן של יוטיוב שותק 3.5 שניות (קורה בסינונים שוברים API), קפוץ אוטומטית לנגן העקיף המאובטח
+                setTimeout(() => {
+                    if (!playerReadyOrError) {
+                        try { ytModalPlayer.destroy(); } catch(e){}
+                        createRawIframeFallback(containerWrapper, videoId);
+                    }
+                }, 3500);
+
             } catch(e) {
                 createRawIframeFallback(containerWrapper, videoId);
             }
