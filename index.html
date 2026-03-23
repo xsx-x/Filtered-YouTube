@@ -1141,7 +1141,8 @@
         startTimer(videoId, detectedFilter === 'NetFree' ? 2 : Math.round(dynamicCheckTimeout / 1000));
 
         if (videoCache[videoId] !== undefined) return finalizeStatus(videoId, videoCache[videoId] ? 'open' : 'blocked', title, false);
-        if (dbStatus === 'blocked') return finalizeStatus(videoId, 'blocked', title, false);
+        // אם הסטטוס במסד הנתונים הוא פתוח, נציג אותו מיד. 
+        // אנו מניחים שאם הוא שם, הוא אומת בעבר בהצלחה. (לא מושכים יותר סרטונים חסומים).
         if (dbStatus === 'open') return finalizeStatus(videoId, 'open', title, false);
 
         if (detectedFilter === 'NetFree') {
@@ -1149,7 +1150,7 @@
                 const res = await fetch(`https://netfree.link/api/video/info?video=${videoId}`);
                 const data = await res.json();
                 if (data.block === false) finalizeStatus(videoId, 'open', title, true);
-                else if (data.block === true) finalizeStatus(videoId, 'blocked', title, true);
+                else if (data.block === true) finalizeStatus(videoId, 'blocked', title, false); // שינוי: לא שומר חסומים ל-DB
                 else finalizeStatus(videoId, 'netfree_pending', title, false);
             } catch (e) { finalizeStatus(videoId, 'netfree_pending', title, false); }
         } else {
@@ -1213,7 +1214,7 @@
                 clearTimeout(timeout); 
                 window.removeEventListener('message', messageListener);
                 try { checkDiv.remove(); } catch(err){} 
-                finalizeStatus(videoId, isOpen ? 'open' : 'blocked', title, true); 
+                finalizeStatus(videoId, isOpen ? 'open' : 'blocked', title, isOpen); // שומר ל-DB רק אם נפתח
                 resolve(); 
             }
         });
@@ -1257,7 +1258,10 @@
             // שומר לתוצאות האישיות בענן ובמקומי!
             saveToUserOpenVideos(videoId, title, thumbUrl); 
             
-            if (saveToDB && detectedFilter !== 'Unknown' && detectedFilter !== 'None') saveToGlobalIndex(videoId, title, true);
+            // השינוי שלך: שומר למאגר הכללי אך ורק אם הסרטון פתוח!
+            if (saveToDB && detectedFilter !== 'Unknown' && detectedFilter !== 'None') {
+                saveToGlobalIndex(videoId, title);
+            }
         } else if (status === 'netfree_pending') {
             tag.innerText = "טרם נבדק"; tag.className = "status-badge status-pending";
             card.classList.add('clickable'); card.onclick = () => openPlayerModal(videoId, title, thumbUrl);
@@ -1265,12 +1269,30 @@
         } else {
             tag.innerText = "חסום"; tag.className = "status-badge status-blocked";
             document.getElementById('blockedRow').appendChild(card);
-            if (saveToDB && detectedFilter !== 'Unknown' && detectedFilter !== 'None') saveToGlobalIndex(videoId, title, false);
+            // הוסר: אין שמירה למאגר הכללי עבור סרטונים שסומנו כחסומים
         }
     }
 
-    async function saveToGlobalIndex(id, title, isOpen) {
-        try { await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/videos`, { method: 'POST', headers: { 'apikey': CONFIG.SUPABASE_KEY, 'Authorization': `Bearer ${CONFIG.SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify({ video_id: id, title: title, status: isOpen ? 'open' : 'blocked', filter_provider: detectedFilter, updated_at: new Date() }) }); } catch (e) {}
+    // הפונקציה עודכנה כך שהיא שומרת רק סטטוס 'open'
+    async function saveToGlobalIndex(id, title) {
+        try { 
+            await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/videos`, { 
+                method: 'POST', 
+                headers: { 
+                    'apikey': CONFIG.SUPABASE_KEY, 
+                    'Authorization': `Bearer ${CONFIG.SUPABASE_KEY}`, 
+                    'Content-Type': 'application/json', 
+                    'Prefer': 'resolution=merge-duplicates' 
+                }, 
+                body: JSON.stringify({ 
+                    video_id: id, 
+                    title: title, 
+                    status: 'open', 
+                    filter_provider: detectedFilter, 
+                    updated_at: new Date() 
+                }) 
+            }); 
+        } catch (e) {}
     }
 
     async function checkNetFreeAdvancedStatus() {
